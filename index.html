@@ -1,0 +1,3311 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>全功能語音跟讀與俚語解析系統</title>
+  <style>
+    :root {
+      --bg-dark: #121212;
+      --bg-panel: #1e1e1e;
+      --bg-card: #282828;
+      --primary: #3b82f6;
+      --success: #22c55e;
+      --warning: #eab308;
+      --danger: #ef4444;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border: #404040;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; padding: 0; background: var(--bg-dark); color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
+    }
+
+    /* 頂部：控制與自訂音檔/可摺疊影片播放器 */
+    .header-panel {
+      flex: 0 0 auto; background: var(--bg-panel); border-bottom: 1px solid var(--border);
+      padding: 10px 14px; box-shadow: 0 4px 6px rgba(0,0,0,.3); z-index: 20;
+    }
+    .file-inputs { display: flex; gap: 6px; margin-bottom: 8px; }
+    .file-btn { 
+      flex: 1; text-align: center; background: rgba(255,255,255,.06); color: #fff; 
+      border: 1px solid var(--border); padding: 8px 6px; border-radius: 8px; 
+      font-size: 13px; cursor: pointer; transition: 0.2s; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .file-btn:active { transform: scale(0.97); background: var(--primary); border-color: var(--primary); }
+    input[type="file"] { display: none; }
+
+    /* 可自由展開/收合的影片視窗 */
+    .video-stage {
+      display: none; width: 100%; max-width: 640px; margin: 0 auto 8px;
+      background: #000; border-radius: 10px; overflow: hidden; border: 1px solid var(--border);
+      position: relative;
+    }
+    .video-stage.show { display: block; }
+    video#mainMedia {
+      width: 100%; max-height: 28vh; display: block; object-fit: contain; background: #000;
+    }
+
+    .custom-player {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,0,0,0.35); padding: 7px 10px; border-radius: 12px;
+      border: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .play-btn {
+      background: var(--primary); color: #fff; border: none;
+      width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; cursor: pointer; transition: 0.15s; font-weight: bold;
+    }
+    .play-btn:active { transform: scale(0.92); }
+    .nav-sent-btn {
+      background: rgba(255,255,255,0.08); color: #e5e7eb; border: 1px solid var(--border);
+      height: 30px; padding: 0 8px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    }
+    .nav-sent-btn:active { transform: scale(0.92); background: var(--primary); }
+    .nav-sent-btn.active-ab {
+      background: rgba(59, 130, 246, 0.25); color: #93c5fd; border-color: var(--primary);
+    }
+    .nav-sent-btn.active-wait {
+      background: rgba(16, 185, 129, 0.22); color: #6ee7b7; border-color: #10b981;
+    }
+    .boost-btn {
+      background: rgba(234, 179, 8, 0.18); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.5);
+      height: 30px; padding: 0 8px; border-radius: 8px; font-size: 12px; font-weight: 800;
+      cursor: pointer; flex-shrink: 0; display: flex; align-items: center; gap: 3px;
+      box-shadow: 0 0 8px rgba(234, 179, 8, 0.2); transition: 0.15s;
+    }
+    .boost-btn:active { transform: scale(0.92); }
+    .boost-btn.mega {
+      background: rgba(239, 68, 68, 0.22); color: #f87171; border-color: #ef4444;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+    }
+    .time-label { font-family: monospace; font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+    .progress-range {
+      flex: 1; accent-color: var(--primary); height: 6px; border-radius: 3px;
+      cursor: pointer; outline: none; min-width: 50px;
+    }
+
+    /* 搜尋與快速過濾列 */
+    .search-bar-row {
+      display: none; align-items: center; gap: 6px; margin-top: 8px;
+    }
+    .search-bar-row.show { display: flex; }
+    .search-inp {
+      flex: 1; background: rgba(0,0,0,0.45); border: 1px solid var(--border);
+      color: #fff; border-radius: 8px; padding: 6px 10px; font-size: 13px; outline: none;
+    }
+    .search-inp:focus { border-color: var(--primary); }
+
+    /* 工具列 */
+    .toolbar { 
+      flex: 0 0 auto; background: var(--bg-panel); padding: 8px 12px;
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between;
+      align-items: center; border-bottom: 1px solid var(--border);
+    }
+    .toolbar-left, .toolbar-right { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
+    .btn { 
+      background: transparent; color: var(--text-muted); border: 1px solid var(--border);
+      padding: 5px 9px; border-radius: 18px; cursor: pointer; font-size: 12px; font-weight: 600; transition: 0.15s;
+    }
+    .btn:active { transform: scale(0.95); }
+    .btn.active { background: rgba(34,197,94,.15); color: var(--success); border-color: var(--success); }
+    .btn.active-star { background: rgba(234,179,8,.15); color: var(--warning); border-color: var(--warning); }
+    .btn.active-test { background: rgba(59,130,246,.15); color: var(--primary); border-color: var(--primary); }
+    .btn.active-sort { background: rgba(249,115,22,.15); color: #f97316; border-color: #f97316; }
+    .btn.active-wordbook { background: rgba(168,85,247,.15); color: #a855f7; border-color: #a855f7; }
+    .btn.active-mask { background: rgba(6,182,212,.15); color: #06b6d4; border-color: #06b6d4; }
+    .btn.active-oral { background: rgba(236,72,153,.18); color: #ec4899; border-color: #ec4899; box-shadow: 0 0 10px rgba(236,72,153,.25); }
+    .btn.active-link { background: rgba(20,184,166,.18); color: #2dd4bf; border-color: #14b8a6; }
+
+    select.btn { outline: none; background: var(--bg-card); color: #fff; padding: 5px 8px; }
+
+    /* 下半部：列表區（底部留白避開 App 底部懸浮球） */
+    .content-wrapper { 
+      flex: 1 1 auto; min-height: 0; overflow-y: auto;
+      -webkit-overflow-scrolling: touch; scroll-behavior: smooth; 
+    }
+    .list-container { padding: 14px; max-width: 900px; margin: 0 auto; padding-bottom: 165px; }
+
+    /* 單題闖關頂部進度橫幅 */
+    .quiz-stage-banner {
+      background: linear-gradient(135deg, rgba(59,130,246,0.16), rgba(34,197,94,0.12));
+      border: 1px solid rgba(59,130,246,0.45);
+      border-radius: 14px; padding: 12px 14px; margin-bottom: 14px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .quiz-stage-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .quiz-stage-title { font-size: 14px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 6px; }
+    .quiz-stage-progress { font-size: 12px; font-weight: 700; color: #86efac; background: rgba(34,197,94,0.18); border: 1px solid rgba(34,197,94,0.4); padding: 4px 10px; border-radius: 12px; }
+    .quiz-stage-sub { font-size: 12.5px; color: #d1d5db; line-height: 1.45; }
+    .quiz-stage-actions { display: flex; gap: 7px; margin-top: 2px; flex-wrap: wrap; align-items: center; }
+    .quiz-action-btn {
+      background: var(--primary); color: #fff; border: none; border-radius: 10px;
+      padding: 7px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 3px 10px rgba(59,130,246,0.3);
+    }
+    .quiz-action-btn:active { transform: scale(0.95); }
+    .quiz-action-btn.secondary {
+      background: rgba(255,255,255,0.1); color: #e5e7eb; border: 1px solid var(--border); box-shadow: none;
+    }
+    .quiz-action-btn.danger-outline {
+      background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35); box-shadow: none;
+    }
+    .quiz-jump-select {
+      background: rgba(0,0,0,0.45); color: #93c5fd; border: 1px solid rgba(59,130,246,0.45);
+      border-radius: 10px; padding: 6px 8px; font-size: 12px; font-weight: 700; outline: none; max-width: 170px;
+    }
+
+    /* 自動留白跟讀倒數提示條 */
+    .shadow-wait-bar {
+      display: none; align-items: center; justify-content: space-between;
+      background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #6ee7b7; padding: 6px 10px; border-radius: 8px; margin-top: 8px;
+      font-size: 12.5px; font-weight: 700;
+    }
+    .shadow-wait-bar.active { display: flex; }
+
+    /* 字幕卡片 */
+    .sub-card { 
+      background: var(--bg-card); border: 2px solid transparent; padding: 14px 16px;
+      margin-bottom: 12px; border-radius: 12px; cursor: pointer; position: relative;
+      transition: border-color .2s, background .2s, box-shadow .2s, opacity .2s; 
+    }
+    .sub-card.active { 
+      border-color: var(--success); background: rgba(34,197,94,.08);
+      box-shadow: 0 0 14px rgba(34,197,94,.18); z-index: 5;
+    }
+    .sub-card.ab-in-range {
+      border-left: 4px solid var(--primary);
+    }
+    .sub-card.mastered-card {
+      opacity: 0.6;
+    }
+    .sub-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 6px; }
+    .sub-header-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .sub-header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .sub-time { font-family: monospace; font-size: 12px; color: var(--text-muted); background: rgba(0,0,0,.3); padding: 2px 6px; border-radius: 4px; }
+    .replay-this-btn {
+      background: rgba(59,130,246,0.22); color: #93c5fd; border: 1px solid rgba(59,130,246,0.5);
+      border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .replay-this-btn:active { transform: scale(0.92); background: var(--primary); color: #fff; }
+    .tts-clear-btn {
+      background: rgba(34,197,94,0.16); color: #86efac; border: 1px solid rgba(34,197,94,0.4);
+      border-radius: 6px; padding: 4px 8px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+    }
+    .tts-clear-btn:active { transform: scale(0.92); background: var(--success); color: #000; }
+    .prac-count-badge {
+      background: rgba(249, 115, 22, 0.2); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.45);
+      font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 10px;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+    .mastered-btn {
+      background: rgba(255,255,255,0.06); color: #9ca3af; border: 1px solid var(--border);
+      border-radius: 8px; padding: 3px 7px; font-size: 11px; font-weight: 700; cursor: pointer; transition: 0.15s;
+    }
+    .mastered-btn.is-mastered {
+      background: rgba(34,197,94,0.2); color: #4ade80; border-color: rgba(34,197,94,0.5);
+    }
+    .quiz-state-tag {
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+    }
+    .quiz-state-tag.current { background: rgba(249,115,22,0.2); color: #fb923c; border: 1px solid rgba(249,115,22,0.45); }
+    .quiz-state-tag.done { background: rgba(34,197,94,0.2); color: #4ade80; border: 1px solid rgba(34,197,94,0.45); }
+
+    .star-btn { background: none; border: none; color: #555; font-size: 22px; cursor: pointer; line-height: 1; padding: 2px 4px; transition: 0.15s; }
+    .star-btn:active { transform: scale(1.25); }
+    .star-btn.starred { color: var(--warning); text-shadow: 0 0 8px rgba(234,179,8,.5); }
+    .sub-text-en { font-size: 19px; font-weight: 600; line-height: 1.45; color: #fff; margin-bottom: 6px; word-wrap: break-word; transition: filter 0.2s; }
+    .sub-text-zh { font-size: 15px; color: var(--text-muted); line-height: 1.4; transition: filter 0.2s; }
+
+    /* 美式連音符號 ‿ 樣式 */
+    .link-arc {
+      color: #2dd4bf; font-weight: 900; font-size: 18px; margin: 0 1px;
+      user-select: none; pointer-events: none; text-shadow: 0 0 6px rgba(45,212,191,0.5);
+    }
+    .phonetic-tip-bar {
+      margin-top: 6px; margin-bottom: 4px; padding: 5px 9px; border-radius: 8px;
+      background: rgba(20, 184, 166, 0.1); border-left: 3px solid #14b8a6;
+      font-size: 12px; color: #99f6e4; line-height: 1.4;
+    }
+
+    /* 字幕遮罩訓練模式 */
+    .mask-zh .sub-text-zh { filter: blur(6px); opacity: 0.35; }
+    .mask-zh .sub-card:active .sub-text-zh { filter: none; opacity: 1; }
+    .mask-en .sub-text-en { filter: blur(7px); opacity: 0.35; }
+    .mask-en .sub-card:active .sub-text-en { filter: none; opacity: 1; }
+    .mask-all .sub-text-en, .mask-all .sub-text-zh { filter: blur(7px); opacity: 0.25; }
+    .mask-all .sub-card:active .sub-text-en, .mask-all .sub-card:active .sub-text-zh { filter: none; opacity: 1; }
+
+    /* 點讀單字與黃色收藏高亮 */
+    .clickable-word { cursor: pointer; transition: 0.15s; border-radius: 4px; padding: 1px 2px; margin: 0 -1px; display: inline-block; }
+    @media (hover: hover) { .clickable-word:hover { color: var(--primary); background: rgba(59,130,246,0.15); } }
+    .clickable-word:active { color: var(--primary); background: rgba(59,130,246,0.25); }
+    .clickable-word.idiom-hint { border-bottom: 2px dotted rgba(234, 179, 8, 0.75); }
+    .clickable-word.saved-word { color: var(--warning) !important; font-weight: 700; text-shadow: 0 0 8px rgba(234, 179, 8, 0.35); }
+    .clickable-word.selected-word { background: rgba(59, 130, 246, 0.35); color: #fff !important; box-shadow: 0 0 0 1px var(--primary); }
+
+    /* 懸浮字典面板：底部往上抬高 96px，避開手機底部彩色符號 */
+    .dict-sheet {
+      position: fixed;
+      left: 12px; right: 12px;
+      bottom: 96px;
+      max-width: 620px; margin: 0 auto;
+      background: rgba(30, 30, 34, 0.98);
+      backdrop-filter: blur(12px);
+      padding: 16px 16px 18px;
+      border-radius: 20px;
+      z-index: 100;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.12);
+      display: flex; flex-direction: column; align-items: center;
+      max-height: calc(100dvh - 180px); overflow-y: auto;
+      transform: translateY(140%); opacity: 0; pointer-events: none;
+      transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
+    }
+    .dict-sheet.show {
+      transform: translateY(0); opacity: 1; pointer-events: auto;
+    }
+    .dict-Sheet-top {
+      width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
+    }
+    .dict-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 12px;
+      letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .dict-badge.slang { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.45); }
+    .dict-badge.phrase { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.45); }
+    .dict-badge.word { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
+    .dict-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; max-width: 92%; justify-content: center; flex-wrap: wrap; }
+    .dict-word { font-size: 23px; font-weight: 700; color: var(--primary); cursor: pointer; text-align: center; }
+    .dict-audio-btn {
+      background: rgba(59,130,246,0.18); border: 1px solid rgba(59,130,246,0.4); color: #93c5fd;
+      border-radius: 50%; width: 28px; height: 28px; font-size: 13px; cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .dict-star { background: none; border: none; color: #555; font-size: 27px; cursor: pointer; padding: 0 4px; line-height: 1; transition: 0.2s; }
+    .dict-star.starred { color: var(--warning); text-shadow: 0 0 10px rgba(234,179,8,.5); }
+    .dict-trans {
+      font-size: 18px; color: #fff; text-align: center; font-weight: 700;
+      margin-bottom: 8px; line-height: 1.4; background: rgba(255,255,255,0.05);
+      padding: 6px 14px; border-radius: 10px; width: 100%;
+    }
+    .dict-note {
+      font-size: 13.5px; color: #fef08a; background: rgba(234, 179, 8, 0.12);
+      border-left: 3px solid var(--warning); padding: 8px 12px; border-radius: 6px;
+      width: 100%; margin-bottom: 8px; line-height: 1.45; text-align: left;
+    }
+    .dict-context-box {
+      width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 12px; margin-top: 2px; text-align: left;
+    }
+    .dict-context-en { font-size: 13.5px; color: #d1d5db; margin-bottom: 3px; line-height: 1.35; }
+    .dict-context-en b { color: #60a5fa; text-decoration: underline; }
+    .dict-context-zh { font-size: 13.5px; color: var(--success); line-height: 1.35; }
+    .dict-expand-bar { display: flex; gap: 8px; margin-top: 10px; width: 100%; justify-content: space-between; }
+    .dict-mini-btn {
+      flex: 1; background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #e5e7eb;
+      padding: 7px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.15s;
+    }
+    .dict-mini-btn:active { transform: scale(0.96); background: var(--primary); }
+    .dict-close { 
+      background: rgba(255,255,255,0.12); border: none; color: #fff;
+      width: 28px; height: 28px; border-radius: 14px; cursor: pointer; font-size: 17px; line-height: 1;
+    }
+
+    /* 測驗 1: 填空考試模式輸入框 */
+    .test-mode .blank-input { 
+      background: rgba(0,0,0,.35); border: none; border-bottom: 2px dashed #6b7280;
+      color: var(--primary); font-size: 19px; font-weight: bold; font-family: inherit; width: 105px;
+      text-align: center; margin: 2px 4px; outline: none; border-radius: 6px 6px 0 0; padding: 4px 6px;
+    }
+    .test-mode .blank-input.correct { border-bottom-color: var(--success); color: var(--success); pointer-events: none; background: rgba(34,197,94,0.1); }
+    .test-mode .blank-input.wrong { border-bottom-color: var(--danger); color: var(--danger); animation: shake .35s; }
+
+    /* 測驗 2: 句子重組模式方塊 */
+    .scramble-container { margin-top: 10px; }
+    .scramble-selected { 
+      min-height: 52px; border: 2px dashed #4b5563; border-radius: 10px; margin-bottom: 12px; 
+      display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 10px; background: rgba(0,0,0,0.25);
+      align-items: center;
+    }
+    .scramble-selected.correct { border-color: var(--success); background: rgba(34,197,94,0.1); }
+    .scramble-selected.correct .scramble-btn { background: rgba(34,197,94,.25); color: var(--success); border-color: var(--success); pointer-events: none; }
+    .scramble-selected.wrong { border-color: var(--danger); animation: shake .35s; }
+    .scramble-selected.wrong .scramble-btn { background: rgba(239,68,68,.2); color: var(--danger); border: 1px solid var(--danger); }
+    .scramble-pool { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+    .scramble-btn { 
+      background: #374151; border: 1px solid #4b5563; padding: 8px 14px; 
+      border-radius: 10px; color: #f3f4f6; font-size: 16px; font-weight: 600; 
+      cursor: pointer; transition: 0.12s; user-select: none;
+    }
+    .scramble-btn:active { transform: scale(0.94); background: var(--primary); border-color: var(--primary); }
+
+    /* 測驗提示按鈕與答案揭曉工具列 */
+    .quiz-hint-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+      padding: 6px 10px; border-radius: 10px;
+      background: rgba(234, 179, 8, 0.08); border: 1px dashed rgba(234, 179, 8, 0.35);
+    }
+    .quiz-hint-label { font-size: 12px; color: #fde047; font-weight: 600; }
+    .quiz-hint-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .hint-pill-btn {
+      background: rgba(234, 179, 8, 0.2); color: #fef08a;
+      border: 1px solid rgba(234, 179, 8, 0.5); border-radius: 8px;
+      padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px; transition: 0.15s;
+    }
+    .hint-pill-btn:active { transform: scale(0.93); background: var(--warning); color: #000; }
+    .hint-pill-btn.reveal-all {
+      background: rgba(59, 130, 246, 0.2); color: #93c5fd; border-color: rgba(59, 130, 246, 0.5);
+    }
+    .hint-pill-btn.reveal-all:active { background: var(--primary); color: #fff; }
+    .answer-peek-box {
+      display: none; width: 100%; margin-top: 4px; padding: 7px 10px;
+      background: rgba(0, 0, 0, 0.5); border-left: 3px solid var(--primary);
+      border-radius: 6px; font-size: 14px; color: #93c5fd; font-weight: 600;
+    }
+    .answer-peek-box.show { display: block; }
+
+    /* 單字本與測驗 3: 拼寫測驗 + 原劇語境例句跳轉 */
+    .word-test-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+    .word-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)); gap: 12px; }
+    .word-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 12px; text-align: center; cursor: pointer; transition: 0.15s; position: relative;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .word-card:active { transform: scale(0.98); border-color: var(--primary); }
+    .word-card-en { font-size: 18px; font-weight: bold; color: var(--warning); margin-bottom: 5px; word-break: break-word; }
+    .word-card-zh { font-size: 13.5px; color: #e5e7eb; line-height: 1.4; margin-bottom: 6px; font-weight: 600; }
+    .word-card-ctx {
+      font-size: 11.5px; color: #9ca3af; background: rgba(0,0,0,0.35);
+      border-radius: 8px; padding: 6px 8px; margin-top: 4px; text-align: left; line-height: 1.35;
+      border-left: 2px solid var(--primary);
+    }
+    .word-ctx-jump-btn {
+      margin-top: 5px; width: 100%; background: rgba(59,130,246,0.16); color: #93c5fd;
+      border: 1px solid rgba(59,130,246,0.4); border-radius: 6px; padding: 4px 6px;
+      font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .word-ctx-jump-btn:active { background: var(--primary); color: #fff; }
+    .word-remove { 
+      position: absolute; top: 4px; right: 8px; color: #666; font-size: 18px; 
+      cursor: pointer; background: none; border: none; padding: 2px;
+    }
+    .word-remove:hover { color: var(--danger); }
+
+    .word-test-input { 
+      width: 100%; background: rgba(0,0,0,.3); border: none; border-bottom: 2px dashed #6b7280; 
+      color: var(--primary); font-size: 16px; font-weight: bold; text-align: center; outline: none; 
+      margin-bottom: 8px; font-family: inherit; border-radius: 4px 4px 0 0; padding: 4px;
+    }
+    .word-test-input.correct { border-bottom-color: var(--success); color: var(--success); pointer-events: none; background: transparent; }
+    .word-test-input.wrong { border-bottom-color: var(--danger); color: var(--danger); animation: shake .35s; }
+
+    /* 測驗 4: 口說 80 分闖關 + 真實錄音回放 + 三色診斷報告 */
+    .oral-box {
+      margin-top: 10px; padding: 12px; border-radius: 12px;
+      background: rgba(0,0,0,0.42); border: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 10px; cursor: default;
+    }
+    .oral-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .oral-btn-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .oral-mic-btn {
+      background: linear-gradient(135deg, #ec4899, #be185d); color: #fff; border: none;
+      padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 700;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+      box-shadow: 0 3px 10px rgba(236,72,153,0.35); transition: 0.15s;
+    }
+    .oral-mic-btn:active { transform: scale(0.95); }
+    .oral-mic-btn.recording {
+      background: var(--danger); animation: pulseRec 1s infinite;
+    }
+    .oral-replay-btn {
+      background: rgba(59,130,246,0.18); color: #93c5fd; border: 1px solid rgba(59,130,246,0.4);
+      padding: 7px 11px; border-radius: 18px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .oral-replay-btn:active { transform: scale(0.95); background: var(--primary); color: #fff; }
+    .oral-myvoice-btn {
+      background: rgba(168, 85, 247, 0.22); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.5);
+      padding: 7px 11px; border-radius: 18px; font-size: 12px; font-weight: 700; cursor: pointer;
+      display: none; align-items: center; gap: 4px;
+    }
+    .oral-myvoice-btn.ready { display: inline-flex; }
+    .oral-myvoice-btn:active { transform: scale(0.95); background: #a855f7; color: #fff; }
+    @keyframes pulseRec {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
+      50% { box-shadow: 0 0 0 9px rgba(239,68,68,0); }
+    }
+    .oral-score-badge {
+      font-size: 13px; font-weight: 800; padding: 4px 11px; border-radius: 12px;
+      background: rgba(255,255,255,0.08); color: var(--text-muted);
+    }
+    .oral-score-badge.pass { background: rgba(34,197,94,0.2); color: var(--success); border: 1px solid var(--success); }
+    .oral-score-badge.fail { background: rgba(239,68,68,0.2); color: var(--danger); border: 1px solid var(--danger); animation: shake .35s; }
+
+    /* 即時收音動態波形與預覽列 */
+    .oral-live-bar {
+      display: none; align-items: center; gap: 8px;
+      background: rgba(239,68,68,0.12); border: 1px dashed rgba(239,68,68,0.5);
+      padding: 7px 10px; border-radius: 8px; font-size: 13px; color: #fca5a5;
+    }
+    .oral-live-bar.active { display: flex; }
+    .wave-bars { display: inline-flex; align-items: center; gap: 3px; height: 14px; }
+    .wave-bars i {
+      display: inline-block; width: 3px; height: 100%; background: #ef4444; border-radius: 2px;
+      animation: waveBounce 0.6s infinite ease-in-out;
+    }
+    .wave-bars i:nth-child(2) { animation-delay: 0.15s; }
+    .wave-bars i:nth-child(3) { animation-delay: 0.3s; }
+    .wave-bars i:nth-child(4) { animation-delay: 0.45s; }
+    @keyframes waveBounce {
+      0%, 100% { transform: scaleY(0.35); }
+      50% { transform: scaleY(1); }
+    }
+
+    /* 逐字診斷膠囊與教練評語 */
+    .oral-report {
+      background: rgba(255,255,255,0.03); border-radius: 10px; padding: 9px 11px;
+      font-size: 13px; color: #d1d5db; line-height: 1.5; border: 1px solid rgba(255,255,255,0.06);
+    }
+    .oral-heard-line { margin-bottom: 6px; color: #9ca3af; font-size: 12.5px; }
+    .oral-heard-line b { color: #f3f4f6; }
+    .oral-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+    .oral-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 9px; border-radius: 8px; font-size: 13.5px; font-weight: 700;
+      cursor: pointer; transition: 0.15s; user-select: none;
+    }
+    .oral-pill:active { transform: scale(0.93); }
+    .oral-pill.ok {
+      background: rgba(34,197,94,0.16); color: #4ade80; border: 1px solid rgba(34,197,94,0.4);
+    }
+    .oral-pill.fuzzy {
+      background: rgba(234,179,8,0.18); color: #facc15; border: 1px solid rgba(234,179,8,0.45);
+    }
+    .oral-pill.miss {
+      background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.45);
+    }
+    .oral-coach-tip {
+      margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.1);
+      font-size: 12.5px; color: #fef08a;
+    }
+
+    .oral-manual-row { display: flex; gap: 6px; width: 100%; margin-top: 2px; }
+    .oral-manual-inp {
+      flex: 1; background: rgba(0,0,0,0.45); border: 1px solid var(--border);
+      color: #fff; border-radius: 8px; padding: 7px 10px; font-size: 13px; outline: none;
+    }
+    .oral-manual-inp:focus { border-color: #ec4899; }
+    .oral-manual-btn {
+      background: var(--primary); color: #fff; border: none; border-radius: 8px;
+      padding: 7px 12px; font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+    }
+
+    .empty-state { text-align: center; color: var(--text-muted); padding: 50px 20px; }
+    .empty-state h3 { color: #fff; margin-bottom: 10px; font-size: 19px; }
+
+    .toast-msg {
+      position: fixed; left: 50%; bottom: 105px; transform: translateX(-50%);
+      background: rgba(34, 197, 94, 0.96); color: #000; font-weight: 700;
+      padding: 8px 16px; border-radius: 20px; font-size: 13px; z-index: 200;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.45); pointer-events: none;
+      max-width: 92vw; text-align: center; line-height: 1.35;
+    }
+    .toast-msg.warn { background: rgba(234, 179, 8, 0.96); }
+
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部：檔案導入與自訂播放器 -->
+  <div class="header-panel">
+    <div class="file-inputs">
+      <label class="file-btn">🎵 1. 音檔/影片<input type="file" id="mediaUpload"></label>
+      <label class="file-btn">📝 2. 字幕 (.srt)<input type="file" id="srtUpload"></label>
+      <button class="file-btn" id="btnToggleVideo" style="display:none; flex:0.65; border-color:#a855f7; color:#d8b4fe;">📺 畫面</button>
+      <button class="file-btn" id="btnToggleSearch" style="flex:0.45;" title="搜尋台詞或單字">🔍</button>
+      <button class="file-btn" id="btnLoadDemo" style="flex:0.75; border-color:#3b82f6; color:#93c5fd;">🎬 範例</button>
+    </div>
+    <!-- 可摺疊影片視窗 -->
+    <div class="video-stage" id="videoStage">
+      <video id="mainMedia" preload="metadata" playsinline webkit-playsinline></video>
+    </div>
+    <div class="custom-player">
+      <button class="nav-sent-btn" id="btnPrevSent" title="上一句">⏮</button>
+      <button class="play-btn" id="btnPlayPause" title="播放/暫停">▶</button>
+      <button class="nav-sent-btn" id="btnNextSent" title="下一句">⏭</button>
+      <span class="time-label" id="timeCurrent">00:00</span>
+      <input type="range" class="progress-range" id="progressBar" min="0" max="100" value="0" step="0.1">
+      <span class="time-label" id="timeTotal">00:00</span>
+      <button class="nav-sent-btn" id="btnShadowWait" title="自動留白跟讀：每句播完自動暫停等長秒數讓你開口模仿">⏱️ 留白</button>
+      <button class="nav-sent-btn" id="btnABRepeat" title="設定 A-B 多句區間循環">🅰️🅱️</button>
+      <button class="boost-btn" id="btnVolumeBoost" title="點擊切換音檔音量放大倍率 (最高 300%)">🔊 200%</button>
+    </div>
+    <div class="search-bar-row" id="searchBarRow">
+      <input type="text" class="search-inp" id="searchInput" placeholder="🔍 輸入英文單字或中文台詞快速篩選句子...">
+      <button class="nav-sent-btn" id="btnClearSearch">清除</button>
+    </div>
+  </div>
+
+  <!-- 工具列 -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <button id="btnAutoScroll" class="btn active">🎯 跟隨</button>
+      <button id="btnFilterStar" class="btn">⭐ 錯題本 (0)</button>
+      <button id="btnWordbook" class="btn">📚 單字本 (0)</button>
+      <button id="btnMaskMode" class="btn" title="切換遮蔽中英字幕訓練聽力">👁️ 雙語</button>
+      <button id="btnLinking" class="btn" title="自動標出美式發音連音 ‿ 與吞音技巧">🔗 連音</button>
+      <button id="btnHideMastered" class="btn" title="隱藏已標記熟練的簡單句">✅ 隱藏已熟 (0)</button>
+    </div>
+    <div class="toolbar-right">
+      <select id="speedSelect" class="btn" title="播放速度">
+        <option value="1.0">🔊 1.0x</option>
+        <option value="0.9">🔊 0.9x</option>
+        <option value="0.8">🔊 0.8x</option>
+        <option value="0.7">🔊 0.7x</option>
+      </select>
+      <button id="btnLoop" class="btn">🔁 單句循環</button>
+      <button id="btnTestMode" class="btn">✏️ 填空</button>
+      <button id="btnSortMode" class="btn">🧩 重組</button>
+      <button id="btnOralMode" class="btn" title="口說測驗：滿80分才可過關，未滿80分強制留級">🎙️ 口說80分闖關</button>
+    </div>
+  </div>
+
+  <!-- 主要內容區 -->
+  <div class="content-wrapper" id="scrollWrapper">
+    <div id="subtitleList" class="list-container"></div>
+    <div id="wordbookList" class="list-container" style="display: none;"></div>
+  </div>
+
+  <!-- 懸浮式字典與道地美式俚語解析面板 -->
+  <div class="dict-sheet" id="dictSheet">
+    <div class="dict-Sheet-top">
+      <div class="dict-badge word" id="dictBadge">📖 單字點讀</div>
+      <button class="dict-close" id="btnDictClose">×</button>
+    </div>
+    <div class="dict-header">
+      <div class="dict-word" id="dictWord" title="點擊重新發音">Word</div>
+      <button class="dict-audio-btn" id="btnDictAudio" title="發音">🔊</button>
+      <button class="dict-star" id="btnDictStar" title="收藏單字/片語（自動綁定原劇例句）">★</button>
+    </div>
+    <div class="dict-trans" id="dictTrans">翻譯載入中...</div>
+    <div class="dict-note" id="dictNote" style="display:none;"></div>
+    <div class="dict-context-box" id="dictContextBox" style="display:none;">
+      <div class="dict-context-en" id="dictContextEn"></div>
+      <div class="dict-context-zh" id="dictContextZh"></div>
+    </div>
+    <div class="dict-expand-bar" id="dictExpandBar">
+      <button class="dict-mini-btn" id="btnExpandPrev">⬅️ 納入前字</button>
+      <button class="dict-mini-btn" id="btnExpandNext">納入後字 ➡️</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const media = $('mainMedia'), videoStage = $('videoStage'), btnToggleVideo = $('btnToggleVideo');
+  const listEl = $('subtitleList'), wordbookEl = $('wordbookList'), wrapper = $('scrollWrapper');
+  const btnPlayPause = $('btnPlayPause'), progressBar = $('progressBar'), timeCurrent = $('timeCurrent'), timeTotal = $('timeTotal');
+  const btnVolumeBoost = $('btnVolumeBoost'), btnABRepeat = $('btnABRepeat'), btnShadowWait = $('btnShadowWait');
+  const searchBarRow = $('searchBarRow'), searchInput = $('searchInput');
+
+  // ★ 1. Web Audio API 數位音訊放大器 (100% / 200% / 300% + 人聲動態壓縮增幅) ★
+  let audioCtx = null;
+  let gainNode = null;
+  let compressorNode = null;
+  let mediaSourceConnected = false;
+  const BOOST_LEVELS = [1.0, 2.0, 3.0];
+  let boostIdx = 1; // 預設 200%
+
+  function initOrUpdateAudioBooster() {
+    media.volume = 1.0;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      if (!audioCtx) {
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      if (!mediaSourceConnected) {
+        const source = audioCtx.createMediaElementSource(media);
+        compressorNode = audioCtx.createDynamicsCompressor();
+        compressorNode.threshold.setValueAtTime(-24, audioCtx.currentTime);
+        compressorNode.knee.setValueAtTime(30, audioCtx.currentTime);
+        compressorNode.ratio.setValueAtTime(8, audioCtx.currentTime);
+        compressorNode.attack.setValueAtTime(0.003, audioCtx.currentTime);
+        compressorNode.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+        gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(BOOST_LEVELS[boostIdx], audioCtx.currentTime);
+
+        source.connect(compressorNode);
+        compressorNode.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        mediaSourceConnected = true;
+      } else if (gainNode && audioCtx) {
+        gainNode.gain.setValueAtTime(BOOST_LEVELS[boostIdx], audioCtx.currentTime);
+      }
+    } catch (e) {
+      media.volume = 1.0;
+    }
+  }
+
+  btnVolumeBoost.addEventListener('click', () => {
+    boostIdx = (boostIdx + 1) % BOOST_LEVELS.length;
+    const mult = BOOST_LEVELS[boostIdx];
+    const pct = Math.round(mult * 100);
+    btnVolumeBoost.textContent = `${pct >= 300 ? '📢' : '🔊'} ${pct}%`;
+    btnVolumeBoost.classList.toggle('mega', pct >= 300);
+    initOrUpdateAudioBooster();
+    showToast(`🔊 音檔數位放大器已設為 ${pct}%（人聲對白增強模式）`);
+  });
+
+  // ★ 2. 內建道地美式俚語、片語與特殊文法庫 (Context-Aware Idiom Dictionary) ★
+  const IDIOM_DB = [
+    { pattern: "notorious b.i.g", zh: "聲名狼藉先生（美國傳奇東岸饒舌歌手 Biggie）", note: "【嘻哈文化】90 年代最具代表性的東岸饒舌巨星，主角 Eddie 的偶像。Notorious 單字原意為「聲名狼藉的、惡名昭彰的」。" },
+    { pattern: "fresh as hell", zh: "潮到爆、帥呆了、超新鮮", note: "【美式俚語】「形容詞 + as hell」在口語中用來極度加強語氣（意為極度...、...到爆），與地獄無關；Fresh 在嘻哈文化中指穿搭或事物「很潮、很酷」。" },
+    { pattern: "hell no", zh: "想都別想、絕對不要", note: "【美式口語】比單純的 No 強烈數倍的拒絕語氣。" },
+    { pattern: "where the hell", zh: "到底在哪裡、見鬼的在哪", note: "【特殊文法】疑問詞（What/Where/Who/How）後接 the hell 用於表達震驚、不耐煩或困惑的強烈語氣。" },
+    { pattern: "chinese narc", zh: "華人抓耙仔、愛告狀的小人", note: "【美式俚語】Narc 原指緝毒警察（Narcotics agent），在校園與街頭俚語中引申為「告密者、抓耙仔」。" },
+    { pattern: "narc", zh: "告密者、抓耙仔", note: "【美式俚語】源自 Narcotics agent，口語中專門罵愛向父母或老師打小報告的人。" },
+    { pattern: "your boy", zh: "你哥們我、本大爺我", note: "【嘻哈俚語】在嘻哈自我介紹時，Your boy 指「你們的好兄弟我」，帶有自信與親近感。" },
+    { pattern: "full-on", zh: "徹頭徹尾、百分之百、完全地", note: "【美式口語】副詞片語，形容毫無保留、全力投入的狀態。" },
+    { pattern: "bought into", zh: "深信不疑、完全買單（某種理念）", note: "【片語動詞】Buy into something 指完全相信並接受某個觀念（如美國夢）。" },
+    { pattern: "hard on", zh: "對...很嚴厲、處處刁難", note: "【常考片語】be hard on someone 指對某人要求極高、嚴格批評。" },
+    { pattern: "tiger mom", zh: "虎媽（高壓嚴格教育的母親）", note: "【文化詞彙】形容採取極度嚴格、高標準管教子女的亞裔母親。" },
+    { pattern: "black sheep", zh: "害群之馬、家族裡的異類", note: "【經典慣用語】因為黑羊在白羊群中格格不入，用來比喻家庭或團體中特立獨行、不被認同的成員。" },
+    { pattern: "grown to love", zh: "逐漸愛上、慢慢喜歡上", note: "【特殊文法】grow to + 原形動詞，表示經過一段時間的相處或體驗後「逐漸變成...」。" },
+    { pattern: "back and forth", zh: "來來回回、兩地奔波", note: "【常用片語】形容在兩個地點之間反覆往返。" },
+    { pattern: "got to motor", zh: "得閃人了、得趕快走了", note: "【美式俚語】Motor 作動詞時在口語中指「快速離開、開溜」。" },
+    { pattern: "give us a holler", zh: "喊我們一聲、跟我們聯絡", note: "【美國南方俚語】Holler 原意為大喊，give someone a holler 即「打個招呼、隨時聯絡」。" },
+    { pattern: "sliced up", zh: "被割得傷痕累累、割傷", note: "【片語動詞】slice up 加上助動詞 got 形成口語被動語態（got sliced up）。" },
+    { pattern: "soft opening", zh: "試營運", note: "【商業慣用語】餐廳或店家在正式盛大開幕（Grand opening）前，先低調開門測試流程的階段。" },
+    { pattern: "figure out", zh: "搞清楚、想出辦法、弄明白", note: "【高頻片語】透過思考或觀察找到問題的答案。" },
+    { pattern: "figured it out", zh: "想通了、找到答案了", note: "【高頻片語】figure out 的過去式，夾代名詞時必須放在中間（figure it out）。" },
+    { pattern: "all about", zh: "眼裡只有...、極度熱衷於...", note: "【美式口語】be all about something 指某人整天只關心、最重視某件事。" },
+    { pattern: "make waves", zh: "興風作浪、惹事生非、出風頭", note: "【經典慣用語】原意為製造波浪，引申為打破平靜、製造麻煩；don't make waves 即「低調點、別惹事」。" },
+    { pattern: "mad dreams", zh: "超狂的夢想、遠大的抱負", note: "【90年代東岸嘻哈俚語】Mad 在這裡不是生氣，而是副詞/形容詞「極度、超多、超猛」（相當於 very / a lot of）。" },
+    { pattern: "in the game", zh: "在圈子裡、在這一行（常指嘻哈圈或人生賽局）", note: "【美式俚語】the game 指某個競爭激烈的領域或社會生存遊戲。" },
+    { pattern: "get a nut", zh: "混口飯吃、賺到第一桶金、出人頭地", note: "【美式街頭俚語】源自松鼠覓食存糧，意指在社會上立足、賺取維持生計與尊嚴的回報。" },
+    { pattern: "how come", zh: "為什麼、怎麼會...？", note: "【特殊文法】美式口語的 Why。注意：How come 後面直接接「主詞 + 動詞」肯定句語序，不需要助動詞倒裝！" },
+    { pattern: "what's up", zh: "嘿、最近怎樣、有什麼事嗎", note: "【美式口語】最道地的日常打招呼用語。" },
+    { pattern: "he's sick", zh: "他超猛、他超強！", note: "【美式俚語】Sick 在青少年與嘻哈俚語中是極高讚美，代表「酷斃了、厲害到不行」，不是生病！" },
+    { pattern: "came out", zh: "（專輯/電影）發行、上市", note: "【常用片語】come out 指產品或作品正式公開推出。" },
+    { pattern: "bonding over", zh: "因為共同喜歡...而建立交情/變熟", note: "【道地片語】bond over something 指兩人透過某個共同話題或嗜好拉近距離。" },
+    { pattern: "with open arms", zh: "張開雙臂、熱烈歡迎", note: "【慣用語】welcome someone with open arms 指毫無排斥、非常熱情地接納某人。" },
+    { pattern: "make the best of it", zh: "既來之則安之、在逆境中盡量往好處看", note: "【經典慣用語】雖然處境不理想，但依然努力從中做到最好。" },
+    { pattern: "on my side", zh: "站在我這邊、支持我", note: "【常用片語】be on someone's side 指在爭執或困境中力挺某人。" },
+    { pattern: "spin-off", zh: "衍生店、山寨衍生作、副牌", note: "【流行文化詞彙】原指影集的衍生劇，這裡幽默指「跟原版長得幾乎一樣的衍生餐廳」。" },
+    { pattern: "born and raised", zh: "土生土長", note: "【道地慣用語】常放在地名後面（如 Orlando, born and raised），表示在那裡出生長大。" },
+    { pattern: "cat person", zh: "貓派、愛貓人士", note: "【美式生活詞彙】喜歡貓的人叫 cat person，喜歡狗的人叫 dog person。" },
+    { pattern: "lactose intolerant", zh: "乳糖不耐症的", note: "【生活醫療詞彙】喝牛奶或吃起司會拉肚子的體質。" },
+    { pattern: "get the word out", zh: "把消息傳出去、做口碑宣傳", note: "【常用片語】讓大家都知道某個好消息或新店家。" },
+    { pattern: "i hear you", zh: "我懂你的意思、我完全理解", note: "【美式口語】並不是「我聽見你的聲音」，而是表達感同身受的「我懂你！」。" },
+    { pattern: "seat at the table", zh: "平起平坐的地位、話語權、融入主流圈", note: "【核心文化隱喻】字面是餐桌上的一個座位，在美國文化中象徵「被主流群體接納、擁有發言權與影響力」。" },
+    { pattern: "change the game", zh: "改變遊戲規則、顛覆局面", note: "【常用慣用語】做出重大突破，徹底改變既有的生態。" },
+    { pattern: "having a hard time", zh: "日子不好過、遭遇困難、適應不良", note: "【高頻片語】have a hard time (+ V-ing / at...) 指在某方面很吃力、很辛苦。" },
+    { pattern: "stand up for", zh: "挺身捍衛、為...出頭說話", note: "【高頻片語】在面對不公或霸凌時，勇敢站出來保護自己或他人。" },
+    { pattern: "make your head spin", zh: "讓你頭暈目眩、快到讓你措手不及", note: "【道地誇飾法】形容事情發生得極快或極為震撼。" },
+    { pattern: "numerous times", zh: "無數次、好幾次", note: "【常用搭配】numerous 意為「許多的、無數的」，比 many 更正式且語氣更強調次數之多。" }
+  ];
+
+  // 3. 內建常見單字離線備用字典
+  const COMMON_WORD_DICT = {
+    "notorious": "聲名狼藉的、惡名昭彰的 (adj.) / 饒舌歌手 Biggie 的名號",
+    "numerous": "許多的、無數的 (adj.)",
+    "unorthodox": "非正統的、不尋常的 (adj.)",
+    "haggle": "討價還價、殺價 (v.)",
+    "anthem": "國歌、代表作、聖歌 (n.)",
+    "outsider": "局外人、邊緣人 (n.)",
+    "humidity": "濕氣、濕度 (n.)",
+    "exotic": "異國風情的、奇異的 (adj.)",
+    "sorority": "大學女生聯誼會 (n.)",
+    "riptide": "激流、離岸流 (n.)",
+    "authentic": "道地的、正宗的 (adj.)",
+    "spittoons": "痰盂 (n.)",
+    "spurs": "馬刺（牛仔靴後跟的金屬刺輪）(n.)",
+    "janitor": "校工、清潔管理員 (n.)",
+    "hilarious": "超爆笑的、極滑稽的 (adj.)",
+    "caucasian": "白種人的、高加索人種的 (adj.)",
+    "wasteful": "浪費的 (adj.)",
+    "filthy": "骯髒的、下流的 (adj.)",
+    "commercial": "電視廣告 (n.) / 商業的 (adj.)",
+    "interrupt": "打斷、插嘴 (v.)",
+    "obscenities": "髒話、猥褻言語 (n.)",
+    "offense": "違規、冒犯、過錯 (n.)",
+    "suspension": "停學處分 (n.)",
+    "suspend": "勒令停學、暫停 (v.)",
+    "fishy": "可疑的、有鬼的 (adj.)",
+    "entree": "（美式餐廳的）主菜 (n.)",
+    "lawless": "無法無天的、沒有法律約束的 (adj.)",
+    "opportunity": "機會、契機 (n.)",
+    "polite": "有禮貌的、客氣的 (adj.)",
+    "respectful": "尊重人的、恭敬的 (adj.)"
+  };
+
+  // 4. 內建《初來乍到 S01E01》精選範例字幕
+  const DEMO_SRT = `1
+00:00:33,280 --> 00:00:36,250
+Mom, check it. Fresh as hell, right?
+媽，妳看。潮到爆對吧？
+
+2
+00:00:36,290 --> 00:00:37,660
+Eddie, don't say "Hell."
+艾迪，不准說「Hell（見鬼）」。
+
+3
+00:00:37,900 --> 00:00:39,520
+He also said "Butthole" in the car.
+他在車上還說了「屁眼」。
+
+4
+00:00:39,560 --> 00:00:41,730
+Shut up, Evan, you little Chinese narc!
+閉嘴，艾文，你這個華人抓耙仔！
+
+5
+00:00:53,940 --> 00:00:56,710
+She never understood that you couldn't haggle at JCPenney.
+她永遠不懂在 JCPenney 百貨是不能殺價的。
+
+6
+00:01:18,300 --> 00:01:20,300
+Full-on bought into the American dream.
+徹頭徹尾對「美國夢」深信不疑。
+
+7
+00:01:20,330 --> 00:01:24,000
+Moms was always hard on me way before all that "Tiger mom" stuff.
+早在「虎媽」這個詞流行之前，老媽就對我超嚴格。
+
+8
+00:01:30,580 --> 00:01:33,140
+And I was definitely the black sheep in my family.
+而我絕對是我們家的異類（害群之馬）。
+
+9
+00:04:14,640 --> 00:04:17,140
+Anyhoo, well, we've got to motor,
+總之呢，我們得先閃人了，
+
+10
+00:04:18,480 --> 00:04:20,440
+so if you ever want to join us, just give us a holler.
+所以如果你們想加入，隨時喊我們一聲。
+
+11
+00:05:02,120 --> 00:05:04,420
+Technically, we are still in our soft opening, so...
+嚴格來說，我們還在試營運階段，所以...
+
+12
+00:06:17,460 --> 00:06:19,160
+respectful, and don't make waves.
+要有禮貌，還有千萬別惹事生非。
+
+13
+00:06:33,310 --> 00:06:39,450
+Me and him are both dudes with mad dreams, just trying to get a nut.
+我和他都是懷抱超狂夢想的哥們，只想在社會上混口飯吃。
+
+14
+00:06:40,750 --> 00:06:43,020
+Dad, how come we have to start school on a Wednesday?
+爸，為什麼我們非得在禮拜三開學？
+
+15
+00:13:52,070 --> 00:13:53,870
+That gets me a seat at the table.
+那樣才能讓我在主流圈子裡有一席之地。`;
+
+  // 全局狀態
+  let state = {
+    view: 'subtitles',
+    mode: 'normal', // 'normal', 'cloze', 'scramble', 'oral'
+    filterStar: false,
+    autoScroll: true,
+    loop: false,
+    wordTest: false,
+    wordOralTest: false,
+    maskMode: 0,       // 0: 雙語顯示, 1: 遮中文, 2: 遮英文, 3: 全遮練聽力
+    showLinking: false,// 美式連音 ‿ 自動標記開關
+    hideMastered: false,// 隱藏已標記熟練的簡單句
+    shadowWait: false, // 免動手「自動留白跟讀模式」（播完一句自動暫停等長秒數讓你開口）
+    searchQuery: ''    // 關鍵字搜尋過濾
+  };
+
+  let subtitles = [], cardMap = new Map();
+  let currentSrtKey = 'demo';
+  let bookmarks = new Set();
+  let savedWords = {};        // 單字翻譯 { word: "翻譯" }
+  let savedWordContexts = {}; // 單字綁定的原劇例句 { word: { en, zh, subId, rawTime } }
+  let oralScores = {};
+  let oralReports = {};
+  let practiceCounts = {};    // 每句練習次數統計 { subId: count }
+  let masteredSet = new Set();// 已熟練句子 ID 集合
+  let recordedAudioMap = {};  // 口說測驗真實錄音 Blob URL { subId: blobUrl }
+
+  // A-B 多句區間循環狀態
+  let abRepeat = {
+    active: false,
+    startSubId: null,
+    endSubId: null
+  };
+
+  // 自動留白跟讀計時器
+  let shadowWaitTimer = null;
+  let shadowWaitCountdownInterval = null;
+  let lastWaitPausedSubId = -1;
+
+  let solvedMap = {
+    cloze: new Set(),
+    scramble: new Set(),
+    oral: new Set()
+  };
+  let lastQuizIdMap = {
+    cloze: -1,
+    scramble: -1,
+    oral: -1
+  };
+  let scrambleDrafts = {};
+  let clozeDrafts = {};
+
+  let currentId = -1, lastUserScroll = 0;
+  let isDraggingProgress = false;
+  let singleSentenceStopAt = null;
+  let audioWatchdog = null;
+  let activeRecognition = null;
+  let activeRecBtn = null;
+  let activeMediaRecorder = null;
+  let activeLookup = {
+    subId: -1,
+    words: [],
+    startIdx: -1,
+    endIdx: -1,
+    phrase: ''
+  };
+
+  function clearShadowWaitTimers() {
+    if (shadowWaitTimer) { clearTimeout(shadowWaitTimer); shadowWaitTimer = null; }
+    if (shadowWaitCountdownInterval) { clearInterval(shadowWaitCountdownInterval); shadowWaitCountdownInterval = null; }
+    document.querySelectorAll('.shadow-wait-bar.active').forEach(el => el.classList.remove('active'));
+  }
+
+  function computeSrtKey(subs) {
+    if (!subs || !subs.length) return 'empty';
+    const first = subs[0].en.slice(0, 12).replace(/\W+/g, '');
+    const last = subs[subs.length - 1].en.slice(0, 12).replace(/\W+/g, '');
+    return `srt_${subs.length}_${first}_${last}`;
+  }
+
+  function saveQuizProgress() {
+    if (!subtitles.length) return;
+    if (isQuizMode() && currentId !== -1) {
+      lastQuizIdMap[state.mode] = currentId;
+    }
+    const payload = {
+      cloze: [...solvedMap.cloze],
+      scramble: [...solvedMap.scramble],
+      oral: [...solvedMap.oral],
+      mastered: [...masteredSet],
+      practiceCounts: practiceCounts,
+      lastQuizIdMap: lastQuizIdMap,
+      oralScores: oralScores,
+      oralReports: oralReports,
+      scrambleDrafts: scrambleDrafts,
+      clozeDrafts: clozeDrafts,
+      lastMode: state.mode,
+      lastCurrentId: currentId,
+      updatedAt: Date.now()
+    };
+    try {
+      localStorage.setItem('shadowing_quiz_' + currentSrtKey, JSON.stringify(payload));
+    } catch (e) {}
+  }
+
+  function loadQuizProgressForCurrentSrt() {
+    currentSrtKey = computeSrtKey(subtitles);
+    solvedMap.cloze.clear();
+    solvedMap.scramble.clear();
+    solvedMap.oral.clear();
+    masteredSet.clear();
+    practiceCounts = {};
+    lastQuizIdMap = { cloze: -1, scramble: -1, oral: -1 };
+    scrambleDrafts = {};
+    clozeDrafts = {};
+
+    try {
+      const raw = localStorage.getItem('shadowing_quiz_' + currentSrtKey);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.cloze)) solvedMap.cloze = new Set(data.cloze);
+      if (Array.isArray(data.scramble)) solvedMap.scramble = new Set(data.scramble);
+      if (Array.isArray(data.oral)) solvedMap.oral = new Set(data.oral);
+      if (Array.isArray(data.mastered)) masteredSet = new Set(data.mastered);
+      if (data.practiceCounts && typeof data.practiceCounts === 'object') {
+        practiceCounts = data.practiceCounts;
+      }
+      if (data.lastQuizIdMap && typeof data.lastQuizIdMap === 'object') {
+        lastQuizIdMap = { ...lastQuizIdMap, ...data.lastQuizIdMap };
+      }
+      if (data.oralScores && typeof data.oralScores === 'object') {
+        oralScores = { ...oralScores, ...data.oralScores };
+      }
+      if (data.oralReports && typeof data.oralReports === 'object') {
+        oralReports = { ...oralReports, ...data.oralReports };
+      }
+      if (data.scrambleDrafts && typeof data.scrambleDrafts === 'object') {
+        scrambleDrafts = data.scrambleDrafts;
+      }
+      if (data.clozeDrafts && typeof data.clozeDrafts === 'object') {
+        clozeDrafts = data.clozeDrafts;
+      }
+      if (data.lastCurrentId && subtitles.some(s => s.id === data.lastCurrentId)) {
+        currentId = data.lastCurrentId;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function incrementPracticeCount(subId) {
+    practiceCounts[subId] = (practiceCounts[subId] || 0) + 1;
+    saveQuizProgress();
+    const card = cardMap.get(subId);
+    if (card) {
+      const badge = card.querySelector('.prac-count-badge');
+      if (badge) badge.textContent = `🔥 ${practiceCounts[subId]}`;
+    }
+  }
+
+  function isQuizMode() {
+    return state.mode === 'cloze' || state.mode === 'scramble' || state.mode === 'oral';
+  }
+
+  function isSubSolved(subId) {
+    if (state.mode === 'oral') return solvedMap.oral.has(subId) || (oralScores['sub_' + subId] || 0) >= 80;
+    if (state.mode === 'cloze') return solvedMap.cloze.has(subId);
+    if (state.mode === 'scramble') return solvedMap.scramble.has(subId);
+    return true;
+  }
+
+  function getFilteredSubtitles() {
+    let list = subtitles;
+    if (state.filterStar) {
+      list = list.filter(s => bookmarks.has(s.id));
+    } else if (state.hideMastered && !isQuizMode()) {
+      list = list.filter(s => !masteredSet.has(s.id));
+    }
+    if (state.searchQuery && !isQuizMode()) {
+      const q = state.searchQuery.toLowerCase();
+      list = list.filter(s => s.en.toLowerCase().includes(q) || (s.zh && s.zh.toLowerCase().includes(q)));
+    }
+    return list;
+  }
+
+  // ★ 核心音檔守門員：鎖定測驗模式範圍、AB多句循環、自動留白跟讀或「播放本句」停止點 ★
+  function enforceQuizAudioBounds() {
+    if (!media.src || !subtitles.length || state.view !== 'subtitles') return;
+
+    const t = media.currentTime;
+
+    if (isQuizMode()) {
+      const activeSub = subtitles.find(s => s.id === currentId) || subtitles[0];
+      if (!activeSub) return;
+
+      if (t < activeSub.start - 0.15) {
+        media.currentTime = activeSub.start;
+      } else if (t >= activeSub.end - 0.03) {
+        if (state.loop) {
+          media.currentTime = activeSub.start;
+        } else {
+          media.pause();
+          media.currentTime = activeSub.start;
+        }
+        if (!isDraggingProgress) {
+          progressBar.value = activeSub.start;
+          timeCurrent.textContent = formatSec(activeSub.start);
+        }
+      }
+      return;
+    }
+
+    // A-B 多句區間循環守門員
+    if (abRepeat.active && abRepeat.startSubId && abRepeat.endSubId) {
+      const startSub = subtitles.find(s => s.id === abRepeat.startSubId);
+      const endSub = subtitles.find(s => s.id === abRepeat.endSubId);
+      if (startSub && endSub && t >= endSub.end - 0.04) {
+        media.currentTime = startSub.start;
+        return;
+      }
+    }
+
+    if (singleSentenceStopAt !== null && t >= singleSentenceStopAt - 0.03) {
+      const activeSub = subtitles.find(s => s.id === currentId);
+      if (state.loop && activeSub) {
+        media.currentTime = activeSub.start;
+      } else {
+        media.pause();
+        singleSentenceStopAt = null;
+      }
+      return;
+    }
+
+    // 免動手「自動留白跟讀 (Shadowing Auto-Wait)」守門員
+    if (state.shadowWait && !media.paused && !state.loop) {
+      const curSub = subtitles.find(s => s.id === currentId);
+      if (curSub && lastWaitPausedSubId !== curSub.id && t >= curSub.end - 0.05) {
+        lastWaitPausedSubId = curSub.id;
+        media.pause();
+        incrementPracticeCount(curSub.id);
+        const durSec = Math.max(2.2, Math.min(7.0, (curSub.end - curSub.start) * 1.15));
+        let remain = Math.ceil(durSec);
+
+        const waitBar = $('waitBar_' + curSub.id);
+        if (waitBar) {
+          waitBar.classList.add('active');
+          waitBar.innerHTML = `<span>🗣️ 請開口跟讀本句！（倒數 <b>${remain}</b> 秒後自動播下一句）</span> <button class="tts-clear-btn" data-skip-wait="1">⏭ 立即下一句</button>`;
+          const skipBtn = waitBar.querySelector('[data-skip-wait]');
+          if (skipBtn) {
+            skipBtn.addEventListener('click', e => {
+              e.stopPropagation();
+              clearShadowWaitTimers();
+              jumpSentence(1);
+            });
+          }
+        }
+
+        shadowWaitCountdownInterval = setInterval(() => {
+          remain--;
+          if (waitBar && remain > 0) {
+            const b = waitBar.querySelector('b');
+            if (b) b.textContent = remain;
+          }
+        }, 1000);
+
+        shadowWaitTimer = setTimeout(() => {
+          clearShadowWaitTimers();
+          const data = getFilteredSubtitles();
+          const idx = data.findIndex(s => s.id === curSub.id);
+          if (idx !== -1 && idx + 1 < data.length) {
+            const nextSub = data[idx + 1];
+            currentId = nextSub.id;
+            setActive(nextSub.id, true);
+            media.currentTime = nextSub.start;
+            media.play().catch(() => {});
+          }
+        }, durSec * 1000);
+      }
+    }
+  }
+
+  function startAudioWatchdog() {
+    if (audioWatchdog) clearInterval(audioWatchdog);
+    audioWatchdog = setInterval(enforceQuizAudioBounds, 40);
+  }
+  startAudioWatchdog();
+
+  function playSentenceAudio(sub, stopAtEnd = true) {
+    if (!sub) return;
+    clearShadowWaitTimers();
+    window.speechSynthesis.cancel();
+    initOrUpdateAudioBooster();
+    incrementPracticeCount(sub.id);
+
+    if (media.src) {
+      singleSentenceStopAt = stopAtEnd ? sub.end : null;
+      media.currentTime = sub.start;
+      progressBar.value = sub.start;
+      timeCurrent.textContent = formatSec(sub.start);
+      media.play().catch(() => {
+        speakText(sub.en, 0.92, 1.0);
+      });
+    } else {
+      speakText(sub.en, 0.92, 1.0);
+    }
+  }
+
+  function advanceToNextQuestion(completedSubId) {
+    const data = getFilteredSubtitles();
+    const idx = data.findIndex(s => s.id === completedSubId);
+
+    let nextSub = null;
+    for (let i = idx + 1; i < data.length; i++) {
+      if (!isSubSolved(data[i].id)) { nextSub = data[i]; break; }
+    }
+    if (!nextSub && idx + 1 < data.length) {
+      nextSub = data[idx + 1];
+    }
+
+    if (nextSub) {
+      currentId = nextSub.id;
+      lastQuizIdMap[state.mode] = currentId;
+      saveQuizProgress();
+      setTimeout(() => {
+        renderSubtitles();
+        playSentenceAudio(nextSub, true);
+      }, 520);
+    } else {
+      saveQuizProgress();
+      setTimeout(() => {
+        if (media.src && !media.paused) media.pause();
+        renderSubtitles();
+        showToast('🏆 太強了！你已經完成目前題庫的所有闖關題目！');
+      }, 450);
+    }
+  }
+
+  /* ---------- 安全載入 LocalStorage ---------- */
+  function loadStorage() {
+    try {
+      const bm = JSON.parse(localStorage.getItem('shadowing_bookmarks') || '[]');
+      if (Array.isArray(bm)) bookmarks = new Set(bm);
+    } catch (e) { bookmarks = new Set(); }
+
+    try {
+      const sw = JSON.parse(localStorage.getItem('shadowing_words') || '{}');
+      if (sw && typeof sw === 'object') savedWords = sw;
+    } catch (e) { savedWords = {}; }
+
+    try {
+      const sc = JSON.parse(localStorage.getItem('shadowing_word_contexts') || '{}');
+      if (sc && typeof sc === 'object') savedWordContexts = sc;
+    } catch (e) { savedWordContexts = {}; }
+  }
+  loadStorage();
+
+  function saveBookmarks() {
+    try { localStorage.setItem('shadowing_bookmarks', JSON.stringify([...bookmarks])); } catch (e) {}
+    updateCounters();
+  }
+
+  function saveWordsToStorage() {
+    try {
+      localStorage.setItem('shadowing_words', JSON.stringify(savedWords));
+      localStorage.setItem('shadowing_word_contexts', JSON.stringify(savedWordContexts));
+    } catch (e) {}
+    updateCounters();
+  }
+
+  function refreshSavedWordsHighlightInDOM() {
+    if (state.view !== 'subtitles' || isQuizMode()) return;
+    listEl.querySelectorAll('.sub-card').forEach(card => {
+      const subId = Number(card.dataset.id);
+      const sub = subtitles.find(s => s.id === subId);
+      if (!sub) return;
+      const words = sub.en.split(/([a-zA-Z]+(?:['-][a-zA-Z]+)*)/).filter(t => /^[a-zA-Z]+(?:['-][a-zA-Z]+)*$/.test(t));
+      card.querySelectorAll('.clickable-word').forEach(span => {
+        const wIdx = Number(span.dataset.wordIdx);
+        const isSaved = isWordIndexSaved(words, wIdx);
+        span.classList.toggle('saved-word', isSaved);
+      });
+    });
+  }
+
+  function updateCounters() {
+    $('btnFilterStar').textContent = `⭐ 錯題本 (${bookmarks.size})`;
+    $('btnWordbook').textContent = `📚 單字本 (${Object.keys(savedWords).length})`;
+    $('btnHideMastered').textContent = `✅ 隱藏已熟 (${masteredSet.size})`;
+
+    if (subtitles.length > 0) {
+      const sCount = solvedMap.scramble.size;
+      const cCount = solvedMap.cloze.size;
+      const oCount = solvedMap.oral.size;
+      $('btnSortMode').textContent = sCount > 0 ? `🧩 重組 (${sCount}/${subtitles.length})` : `🧩 重組`;
+      $('btnTestMode').textContent = cCount > 0 ? `✏️ 填空 (${cCount}/${subtitles.length})` : `✏️ 填空`;
+      $('btnOralMode').textContent = oCount > 0 ? `🎙️ 口說80分 (${oCount}/${subtitles.length})` : `🎙️ 口說80分闖關`;
+    }
+  }
+
+  function showToast(msg, isWarn = false) {
+    document.querySelectorAll('.toast-msg').forEach(el => el.remove());
+    const t = document.createElement('div');
+    t.className = 'toast-msg' + (isWarn ? ' warn' : '');
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2700);
+  }
+
+  /* ---------- 自訂播放器、留白跟讀與 A-B 多句區間循環控制 ---------- */
+  function formatSec(sec) {
+    if (!isFinite(sec) || sec < 0) return '00:00';
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = Math.floor(sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  btnPlayPause.addEventListener('click', () => {
+    clearShadowWaitTimers();
+    initOrUpdateAudioBooster();
+    const activeSub = subtitles.find(s => s.id === currentId) || subtitles[0];
+    if (!media.src) {
+      if (activeSub) {
+        setActive(activeSub.id, true);
+        incrementPracticeCount(activeSub.id);
+        speakText(activeSub.en, 0.92, 1.0);
+        showToast('💡 未導入音檔，已使用最大音量語音朗讀當前句');
+      } else {
+        showToast('請先導入音檔或點擊「🎬 範例」', true);
+      }
+      return;
+    }
+
+    if (media.paused) {
+      singleSentenceStopAt = null;
+      lastWaitPausedSubId = -1;
+      if (isQuizMode() && activeSub) {
+        media.currentTime = activeSub.start;
+      }
+      media.play().catch(() => {});
+    } else {
+      media.pause();
+    }
+  });
+
+  // ⏱️ 自動留白跟讀模式切換
+  btnShadowWait.addEventListener('click', () => {
+    state.shadowWait = !state.shadowWait;
+    clearShadowWaitTimers();
+    btnShadowWait.classList.toggle('active-wait', state.shadowWait);
+    showToast(state.shadowWait
+      ? '⏱️ 已開啟「自動留白跟讀」：每播完一句會自動暫停等長秒數讓你開口跟讀，再自動播下一句！'
+      : '已關閉自動留白跟讀');
+  });
+
+  // 🔍 搜尋欄開關與即時篩選
+  $('btnToggleSearch').addEventListener('click', () => {
+    const isShowing = searchBarRow.classList.toggle('show');
+    if (isShowing) {
+      searchInput.focus();
+    } else {
+      state.searchQuery = '';
+      searchInput.value = '';
+      renderSubtitles();
+    }
+  });
+  searchInput.addEventListener('input', () => {
+    state.searchQuery = searchInput.value.trim();
+    renderSubtitles();
+  });
+  $('btnClearSearch').addEventListener('click', () => {
+    state.searchQuery = '';
+    searchInput.value = '';
+    renderSubtitles();
+  });
+
+  // 🅰️🅱️ 多句區間循環設定
+  btnABRepeat.addEventListener('click', () => {
+    if (!subtitles.length) return;
+    const curSub = subtitles.find(s => s.id === currentId) || subtitles[0];
+    if (!abRepeat.startSubId) {
+      abRepeat.startSubId = curSub.id;
+      abRepeat.endSubId = null;
+      abRepeat.active = false;
+      btnABRepeat.textContent = `🅰️ #${curSub.id}...`;
+      btnABRepeat.classList.add('active-ab');
+      showToast(`🅰️ 已設第 #${curSub.id} 句為起點！請點選要結束的句子後再按一次設定 B 點`);
+    } else if (!abRepeat.endSubId) {
+      const startSub = subtitles.find(s => s.id === abRepeat.startSubId);
+      if (curSub.start < startSub.start) {
+        abRepeat.endSubId = abRepeat.startSubId;
+        abRepeat.startSubId = curSub.id;
+      } else {
+        abRepeat.endSubId = curSub.id;
+      }
+      abRepeat.active = true;
+      btnABRepeat.textContent = `🔁 #${abRepeat.startSubId}-#${abRepeat.endSubId}`;
+      renderSubtitles();
+      const sSub = subtitles.find(s => s.id === abRepeat.startSubId);
+      if (sSub && media.src) {
+        singleSentenceStopAt = null;
+        media.currentTime = sSub.start;
+        media.play().catch(() => {});
+      }
+      showToast(`🔁 已啟動第 #${abRepeat.startSubId} ～ #${abRepeat.endSubId} 句區間循環！（再按一次可取消）`);
+    } else {
+      abRepeat = { active: false, startSubId: null, endSubId: null };
+      btnABRepeat.textContent = '🅰️🅱️';
+      btnABRepeat.classList.remove('active-ab');
+      renderSubtitles();
+      showToast('已關閉 A-B 多句區間循環');
+    }
+  });
+
+  // 📺 影片畫面展開/收合
+  btnToggleVideo.addEventListener('click', () => {
+    const isShowing = videoStage.classList.toggle('show');
+    btnToggleVideo.textContent = isShowing ? '🙈 收起畫面' : '📺 展開畫面';
+  });
+
+  media.addEventListener('play', () => {
+    btnPlayPause.textContent = '⏸';
+    initOrUpdateAudioBooster();
+    enforceQuizAudioBounds();
+  });
+  media.addEventListener('pause', () => { btnPlayPause.textContent = '▶'; });
+
+  function jumpSentence(offset) {
+    if (!subtitles.length) return;
+    clearShadowWaitTimers();
+    const data = getFilteredSubtitles();
+    if (!data.length) return;
+    let idx = data.findIndex(s => s.id === currentId);
+    if (idx === -1) idx = 0;
+
+    const curSub = data[idx];
+    if (offset > 0 && isQuizMode() && curSub && !isSubSolved(curSub.id)) {
+      const modeNames = { cloze: '填空測驗', scramble: '句子重組', oral: '口說80分闖關' };
+      showToast(`🔒 請先完成本題【${modeNames[state.mode]}】，答對後才能前往下一題！（進度已自動保存）`, true);
+      playSentenceAudio(curSub, true);
+      return;
+    }
+
+    idx = Math.max(0, Math.min(data.length - 1, idx + offset));
+    const target = data[idx];
+    currentId = target.id;
+    lastWaitPausedSubId = -1;
+    if (isQuizMode()) {
+      lastQuizIdMap[state.mode] = currentId;
+      saveQuizProgress();
+    }
+    renderSubtitles();
+    setActive(target.id, true);
+    playSentenceAudio(target, !state.shadowWait);
+  }
+
+  $('btnPrevSent').addEventListener('click', () => jumpSentence(-1));
+  $('btnNextSent').addEventListener('click', () => jumpSentence(1));
+
+  media.addEventListener('loadedmetadata', () => {
+    progressBar.max = media.duration || 100;
+    timeTotal.textContent = formatSec(media.duration);
+    media.playbackRate = parseFloat($('speedSelect').value);
+    initOrUpdateAudioBooster();
+    if (isQuizMode()) {
+      const activeSub = subtitles.find(s => s.id === currentId) || subtitles[0];
+      if (activeSub) media.currentTime = activeSub.start;
+    }
+  });
+
+  progressBar.addEventListener('input', () => {
+    isDraggingProgress = true;
+    timeCurrent.textContent = formatSec(parseFloat(progressBar.value));
+  });
+
+  progressBar.addEventListener('change', () => {
+    const targetTime = parseFloat(progressBar.value);
+    const activeSub = subtitles.find(s => s.id === currentId);
+    if (isQuizMode() && activeSub) {
+      progressBar.value = activeSub.start;
+      if (media.src) media.currentTime = activeSub.start;
+      isDraggingProgress = false;
+      showToast('🔒 闖關模式中，音檔已鎖定在目前題目！答對後自動推進下一題', true);
+      return;
+    }
+    singleSentenceStopAt = null;
+    clearShadowWaitTimers();
+    if (media.src) media.currentTime = targetTime;
+    isDraggingProgress = false;
+  });
+
+  $('speedSelect').addEventListener('change', e => {
+    media.playbackRate = parseFloat(e.target.value);
+    showToast(`播放速度已設為 ${e.target.value}x`);
+  });
+
+  /* ---------- 檔案載入與 SRT 解析 ---------- */
+  $('mediaUpload').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) {
+      media.src = URL.createObjectURL(f);
+      media.load();
+      initOrUpdateAudioBooster();
+      const isVideoFile = /\.(mp4|mkv|webm|mov)$/i.test(f.name) || f.type.startsWith('video/');
+      btnToggleVideo.style.display = isVideoFile ? 'inline-block' : 'none';
+      if (isVideoFile) {
+        videoStage.classList.add('show');
+        btnToggleVideo.textContent = '🙈 收起畫面';
+      } else {
+        videoStage.classList.remove('show');
+      }
+      showToast(`已載入媒體：${f.name} (已自動啟用 200% 音量增強)`);
+    }
+    e.target.value = '';
+  });
+
+  $('srtUpload').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      const buffer = ev.target.result;
+      let text = new TextDecoder('utf-8').decode(buffer);
+      if (text.includes('\uFFFD')) {
+        text = new TextDecoder('gb18030').decode(buffer);
+      }
+      const parsed = parseSubtitles(text);
+      if (parsed.length > 0) {
+        subtitles = parsed;
+        currentId = subtitles[0].id;
+        try { localStorage.setItem('shadowing_last_srt', text); } catch (err) {}
+        const hasHistory = loadQuizProgressForCurrentSrt();
+        updateCounters();
+        renderSubtitles();
+        if (hasHistory && (solvedMap.scramble.size > 0 || solvedMap.cloze.size > 0 || solvedMap.oral.size > 0)) {
+          showToast(`📂 已載入 ${subtitles.length} 句字幕，並自動還原上次的闖關進度！`);
+        } else {
+          showToast(`成功載入 ${subtitles.length} 句字幕`);
+        }
+      } else {
+        showToast('解析失敗，請確認檔案為有效 SRT 格式', true);
+      }
+    };
+    r.readAsArrayBuffer(f);
+    e.target.value = '';
+  });
+
+  $('btnLoadDemo').addEventListener('click', () => {
+    subtitles = parseSubtitles(DEMO_SRT);
+    currentId = subtitles[0].id;
+    try { localStorage.setItem('shadowing_last_srt', DEMO_SRT); } catch (err) {}
+    loadQuizProgressForCurrentSrt();
+    state.filterStar = false;
+    state.view = 'subtitles';
+    syncToolbarUI();
+    listEl.style.display = 'block';
+    wordbookEl.style.display = 'none';
+    renderSubtitles();
+    showToast('已載入《初來乍到》15 句經典範例（保留全部道地俚語解析與進度記憶）！');
+  });
+
+  function parseSubtitles(text) {
+    text = text.replace(/^\uFEFF/, '').replace(/\r/g, '').trim();
+    const blocks = text.split(/\n\s*\n/), out = [];
+    blocks.forEach(block => {
+      const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) return;
+      const tIdx = lines.findIndex(l => /-->/.test(l));
+      if (tIdx === -1) return;
+      const m = lines[tIdx].match(/(\d{1,2}:\d{2}:\d{2}[.,]\d{1,3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[.,]\d{1,3})/);
+      if (!m) return;
+
+      const body = lines.slice(tIdx + 1)
+        .map(l => l.replace(/\{\\[^}]*\}/g, '').replace(/<\/?[^>]+>/g, '').trim())
+        .filter(Boolean);
+      if (!body.length) return;
+
+      let en = '', zh = '';
+      if (body.length === 1) {
+        en = body[0];
+      } else {
+        const firstHasZh = /[\u4e00-\u9fa5]/.test(body[0]);
+        if (firstHasZh) { zh = body[0]; en = body.slice(1).join(' '); }
+        else { en = body[0]; zh = body.slice(1).join(' '); }
+      }
+      out.push({
+        id: out.length + 1,
+        start: toSec(m[1]),
+        end: toSec(m[2]),
+        rawTime: m[1].substring(0, 8),
+        en: en.trim(),
+        zh: zh.trim()
+      });
+    });
+    return out.sort((a, b) => a.start - b.start).map((item, idx) => ({ ...item, id: idx + 1 }));
+  }
+
+  function toSec(s) {
+    const parts = s.split(/[.,]/), [h, m, sec] = parts[0].split(':').map(Number);
+    return h * 3600 + m * 60 + sec + (Number((parts[1] || '0').padEnd(3, '0').substring(0, 3)) / 1000);
+  }
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  /* ---------- ★ 智慧俚語匹配、黃色收藏高亮與美式連音 ‿ 分析引擎 ★ ---------- */
+  function findIdiomMatchInSentence(words, clickedIdx) {
+    const lowerWords = words.map(w => w.toLowerCase());
+    for (const item of IDIOM_DB) {
+      const targetTokens = item.pattern.split(/\s+/);
+      const len = targetTokens.length;
+      for (let i = 0; i <= lowerWords.length - len; i++) {
+        if (clickedIdx < i || clickedIdx >= i + len) continue;
+        let match = true;
+        for (let j = 0; j < len; j++) {
+          if (lowerWords[i + j] !== targetTokens[j]) { match = false; break; }
+        }
+        if (match) {
+          return { startIdx: i, endIdx: i + len - 1, phrase: words.slice(i, i + len).join(' '), info: item };
+        }
+      }
+    }
+    return null;
+  }
+
+  function isWordIndexSaved(words, idx) {
+    if (!words[idx]) return false;
+    const singleLower = words[idx].toLowerCase();
+    if (savedWords[singleLower]) return true;
+    const savedKeys = Object.keys(savedWords);
+    for (const key of savedKeys) {
+      if (!key.includes(' ')) continue;
+      const keyTokens = key.split(/\s+/);
+      const len = keyTokens.length;
+      for (let i = 0; i <= words.length - len; i++) {
+        if (idx < i || idx >= i + len) continue;
+        let match = true;
+        for (let j = 0; j < len; j++) {
+          if (words[i + j].toLowerCase() !== keyTokens[j]) { match = false; break; }
+        }
+        if (match) return true;
+      }
+    }
+    return false;
+  }
+
+  function shouldLinkWords(w1, w2) {
+    if (!w1 || !w2) return false;
+    const a = w1.toLowerCase().replace(/[^a-z]/g, '');
+    const b = w2.toLowerCase().replace(/[^a-z]/g, '');
+    if (!a || !b) return false;
+    const endsWithLinkable = /[bcdfghjklmnpqrstvwxz]$/.test(a) || /(ke|ve|te|de|le|se|ze|ce|me|ne|pe|re)$/.test(a);
+    const startsWithVowel = /^[aeiou]/.test(b);
+    return endsWithLinkable && startsWithVowel;
+  }
+
+  function getPhoneticTipsForSentence(en) {
+    const tokens = en.split(/([a-zA-Z]+(?:['-][a-zA-Z]+)*)/);
+    const words = tokens.filter(t => /^[a-zA-Z]+(?:['-][a-zA-Z]+)*$/.test(t));
+    const links = [];
+    for (let i = 0; i < words.length - 1; i++) {
+      if (shouldLinkWords(words[i], words[i + 1])) {
+        links.push(`${words[i]}‿${words[i + 1]}`);
+      }
+    }
+    const reductions = [];
+    const lower = en.toLowerCase();
+    if (/\bgonna\b/.test(lower)) reductions.push('gonna (going to 連讀)');
+    if (/\bgot to\b/.test(lower)) reductions.push('got to ➔ 常連讀為 gotta');
+    if (/\bwant to\b/.test(lower)) reductions.push('want to ➔ 常連讀為 wanna');
+    if (/\bdon't\s+[bcdfghjklmnpqrstvwxz]/i.test(en)) reductions.push("don't 尾音 t 遇子音略讀停頓");
+
+    if (!links.length && !reductions.length) return '';
+    const parts = [];
+    if (links.length) parts.push(`🔗 <b>連音技巧：</b>${links.join(' 、 ')}`);
+    if (reductions.length) parts.push(`🗣️ <b>美式弱讀/吞音：</b>${reductions.join(' ； ')}`);
+    return `<div class="phonetic-tip-bar">${parts.join(' ｜ ')}</div>`;
+  }
+
+  function formatNormalHTML(sub) {
+    const tokens = sub.en.split(/([a-zA-Z]+(?:['-][a-zA-Z]+)*)/);
+    const wordList = tokens.filter(t => /^[a-zA-Z]+(?:['-][a-zA-Z]+)*$/.test(t));
+    let wordCounter = 0;
+
+    return tokens.map((part, idx) => {
+      if (/^[a-zA-Z]+(?:['-][a-zA-Z]+)*$/.test(part)) {
+        const wIdx = wordCounter++;
+        const hasIdiom = !!findIdiomMatchInSentence(wordList, wIdx);
+        const isSaved = isWordIndexSaved(wordList, wIdx);
+        const classes = ['clickable-word'];
+        if (hasIdiom) classes.push('idiom-hint');
+        if (isSaved) classes.push('saved-word');
+        return `<span class="${classes.join(' ')}" data-sub-id="${sub.id}" data-word-idx="${wIdx}" data-word="${esc(part)}">${esc(part)}</span>`;
+      }
+      if (state.showLinking && /^\s+$/.test(part) && idx > 0 && idx < tokens.length - 1) {
+        const prevW = tokens[idx - 1];
+        const nextW = tokens[idx + 1];
+        if (shouldLinkWords(prevW, nextW)) {
+          return `<span class="link-arc">‿</span>`;
+        }
+      }
+      return esc(part);
+    }).join('');
+  }
+
+  /* ---------- 口說診斷與三色逐字分析引擎 ---------- */
+  const CONTRACTIONS_MAP = {
+    "i'm": ["i", "am"],
+    "you're": ["you", "are"],
+    "he's": ["he", "is"],
+    "she's": ["she", "is"],
+    "it's": ["it", "is"],
+    "we're": ["we", "are"],
+    "they're": ["they", "are"],
+    "we've": ["we", "have"],
+    "i've": ["i", "have"],
+    "you'll": ["you", "will"],
+    "he'll": ["he", "will"],
+    "i'll": ["i", "will"],
+    "i'd": ["i", "would"],
+    "don't": ["do", "not"],
+    "doesn't": ["does", "not"],
+    "didn't": ["did", "not"],
+    "can't": ["can", "not"],
+    "couldn't": ["could", "not"],
+    "isn't": ["is", "not"],
+    "aren't": ["are", "not"],
+    "wasn't": ["was", "not"],
+    "weren't": ["were", "not"],
+    "won't": ["will", "not"],
+    "what's": ["what", "is"],
+    "that's": ["that", "is"],
+    "there's": ["there", "is"],
+    "who's": ["who", "is"],
+    "let's": ["let", "us"],
+    "gonna": ["going", "to"],
+    "wanna": ["want", "to"],
+    "gotta": ["got", "to"]
+  };
+
+  function normalizeTokens(str) {
+    const raw = String(str).toLowerCase()
+      .replace(/[^a-z0-9'\s]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    const expanded = [];
+    raw.forEach(w => {
+      if (CONTRACTIONS_MAP[w]) expanded.push(...CONTRACTIONS_MAP[w]);
+      else expanded.push(w.replace(/^'+|'+$/g, ''));
+    });
+    return expanded.filter(Boolean);
+  }
+
+  function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+      }
+    }
+    return dp[m][n];
+  }
+
+  function evaluateOralSpeech(targetText, spokenText) {
+    const displayWords = String(targetText).trim().split(/\s+/).filter(Boolean);
+    const spokenWords = normalizeTokens(spokenText);
+
+    if (!displayWords.length || !spokenWords.length) {
+      return {
+        score: 0,
+        htmlDiff: `<div class="oral-coach-tip">⚠️ 未偵測到語音內容。若麥克風被 App 阻擋，請點下方輸入框並按手機鍵盤上的「🎤 麥克風」開口唸！</div>`
+      };
+    }
+
+    const pool = [...spokenWords];
+    let exactCount = 0;
+    let fuzzyCount = 0;
+    const missedList = [];
+    const fuzzyList = [];
+
+    const pillsHtml = displayWords.map(origWord => {
+      const cleanOrig = origWord.replace(/[^a-zA-Z0-9']/g, '');
+      const subTokens = normalizeTokens(cleanOrig);
+      if (!subTokens.length) return '';
+
+      let status = 'miss';
+      let matchedSpoken = '';
+
+      const allExactFound = subTokens.every(tok => pool.includes(tok));
+      if (allExactFound) {
+        status = 'ok';
+        subTokens.forEach(tok => {
+          const idx = pool.indexOf(tok);
+          if (idx !== -1) pool.splice(idx, 1);
+        });
+        exactCount++;
+      } else {
+        const primaryToken = subTokens[0];
+        let fIdx = pool.findIndex(sw => {
+          const dist = levenshtein(primaryToken, sw);
+          return (primaryToken.length >= 4 && dist <= 2) || (primaryToken.length === 3 && dist === 1) || (sw[0] === primaryToken[0] && Math.abs(sw.length - primaryToken.length) <= 1 && dist <= 2);
+        });
+        if (fIdx !== -1) {
+          status = 'fuzzy';
+          matchedSpoken = pool[fIdx];
+          pool.splice(fIdx, 1);
+          fuzzyCount++;
+          fuzzyList.push(`${cleanOrig} (聽成 ${matchedSpoken})`);
+        } else {
+          missedList.push(cleanOrig);
+        }
+      }
+
+      const icon = status === 'ok' ? '✓' : (status === 'fuzzy' ? '≈' : '✗');
+      const tipAttr = status === 'fuzzy' ? `title="發音近似：系統聽成 ${esc(matchedSpoken)}，點擊聽標準發音"` : `title="點擊聽「${esc(cleanOrig)}」標準發音"`;
+      return `<span class="oral-pill ${status}" data-speak-word="${esc(cleanOrig)}" ${tipAttr}>${icon} ${esc(origWord)}</span>`;
+    }).join('');
+
+    const totalWords = Math.max(displayWords.length, 1);
+    const wordScore = ((exactCount * 1.0) + (fuzzyCount * 0.65)) / totalWords;
+
+    const cleanTargetStr = normalizeTokens(targetText).join(' ');
+    const cleanSpokenStr = spokenWords.join(' ');
+    const maxLen = Math.max(cleanTargetStr.length, cleanSpokenStr.length, 1);
+    const charRatio = Math.max(0, 1 - levenshtein(cleanTargetStr, cleanSpokenStr) / maxLen);
+
+    const finalScore = Math.min(100, Math.max(0, Math.round((wordScore * 0.72 + charRatio * 0.28) * 100)));
+
+    let coachAdvice = '';
+    if (finalScore >= 90) {
+      coachAdvice = `🌟 完美發音！語調與連音都非常清晰道地！`;
+    } else if (finalScore >= 80) {
+      coachAdvice = `🎉 恭喜滿 80 分過關！${fuzzyList.length ? `小提醒：可點黃色字「${fuzzyList.join('、')}」微調發音。` : '繼續保持這個語感！'}`;
+    } else {
+      const tips = [];
+      if (missedList.length) {
+        tips.push(`漏聽或開頭太早唸了：<b>${esc(missedList.join(', '))}</b>（建議按錄音後等 0.3 秒再開口）`);
+      }
+      if (fuzzyList.length) {
+        tips.push(`發音偏掉：<b>${esc(fuzzyList.join('、'))}</b>`);
+      }
+      coachAdvice = `💡 <b>未滿 80 分診斷：</b>${tips.join('；')}。<br>👉 點擊上方<b>紅/黃色單字膠囊</b>可單獨聽標準發音，或點<b>「🎧 聽我的錄音」</b>比對原音！`;
+    }
+
+    const htmlReport = `
+      <div class="oral-heard-line">👂 系統聽到的句子：「<b>${esc(spokenText)}</b>」</div>
+      <div class="oral-pills">${pillsHtml}</div>
+      <div class="oral-coach-tip">${coachAdvice}</div>
+    `;
+
+    return { score: finalScore, htmlDiff: htmlReport };
+  }
+
+  function toggleSpeechRecognition(onFinalEvaluate, btnEl, liveBarEl, fallbackRowEl, subIdForAudio = null) {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (activeRecognition && activeRecBtn === btnEl) {
+      try { activeRecognition.stop(); } catch (e) {}
+      if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+        try { activeMediaRecorder.stop(); } catch (e) {}
+      }
+      return;
+    }
+
+    if (activeRecognition) {
+      try { activeRecognition.abort(); } catch (e) {}
+      activeRecognition = null;
+    }
+
+    if (subIdForAudio !== null && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        try {
+          const chunks = [];
+          const mr = new MediaRecorder(stream);
+          activeMediaRecorder = mr;
+          mr.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+          mr.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            if (chunks.length > 0) {
+              const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
+              if (recordedAudioMap[subIdForAudio]) URL.revokeObjectURL(recordedAudioMap[subIdForAudio]);
+              recordedAudioMap[subIdForAudio] = URL.createObjectURL(blob);
+              const myVoiceBtn = $('oralMyVoice_' + subIdForAudio);
+              if (myVoiceBtn) myVoiceBtn.classList.add('ready');
+            }
+          };
+          mr.start();
+        } catch (e) {}
+      }).catch(() => {});
+    }
+
+    if (!SpeechRec) {
+      showToast('此瀏覽器不支援直接錄音，請點下方輸入框用手機鍵盤「🎤語音輸入」開口測驗', true);
+      if (fallbackRowEl) {
+        const inp = fallbackRowEl.querySelector('.oral-manual-inp');
+        if (inp) inp.focus();
+      }
+      return;
+    }
+
+    try {
+      const rec = new SpeechRec();
+      activeRecognition = rec;
+      activeRecBtn = btnEl;
+      rec.lang = 'en-US';
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.maxAlternatives = 3;
+
+      let finalTranscript = '';
+      let interimTranscript = '';
+      let silenceTimer = null;
+      let hasEvaluated = false;
+
+      const finishAndScore = () => {
+        if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+          try { activeMediaRecorder.stop(); } catch (e) {}
+        }
+        if (hasEvaluated) return;
+        const combined = (finalTranscript + ' ' + interimTranscript).trim();
+        if (combined) {
+          hasEvaluated = true;
+          onFinalEvaluate(combined);
+        }
+      };
+
+      const resetSilenceTimer = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          try { rec.stop(); } catch (e) {}
+        }, 2200);
+      };
+
+      btnEl.classList.add('recording');
+      btnEl.innerHTML = '🛑 錄音中... (唸完點此計分)';
+      if (liveBarEl) {
+        liveBarEl.classList.add('active');
+        liveBarEl.innerHTML = `<span class="wave-bars"><i></i><i></i><i></i><i></i></span> <span class="live-txt">請開口朗讀整句英文...</span>`;
+      }
+
+      rec.onresult = ev => {
+        interimTranscript = '';
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const txt = ev.results[i][0].transcript;
+          if (ev.results[i].isFinal) {
+            finalTranscript += txt + ' ';
+          } else {
+            interimTranscript += txt;
+          }
+        }
+        const currentHeard = (finalTranscript + ' ' + interimTranscript).trim();
+        if (liveBarEl && currentHeard) {
+          const txtSpan = liveBarEl.querySelector('.live-txt');
+          if (txtSpan) txtSpan.textContent = `即時收音：「${currentHeard}」`;
+        }
+        resetSilenceTimer();
+      };
+
+      rec.onerror = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        btnEl.classList.remove('recording');
+        btnEl.innerHTML = '🎙️ 點擊開口跟讀評測';
+        if (liveBarEl) liveBarEl.classList.remove('active');
+
+        const combined = (finalTranscript + ' ' + interimTranscript).trim();
+        if (combined) {
+          finishAndScore();
+        } else {
+          showToast('⚠️ 麥克風被阻擋或未收到聲音！請直接點下方輸入框按鍵盤「🎤」語音輸入', true);
+          if (fallbackRowEl) {
+            const inp = fallbackRowEl.querySelector('.oral-manual-inp');
+            if (inp) inp.focus();
+          }
+        }
+      };
+
+      rec.onend = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        btnEl.classList.remove('recording');
+        btnEl.innerHTML = '🎙️ 點擊開口跟讀評測';
+        if (liveBarEl) liveBarEl.classList.remove('active');
+        activeRecognition = null;
+        activeRecBtn = null;
+        finishAndScore();
+      };
+
+      rec.start();
+    } catch (err) {
+      showToast('請點下方輸入框，使用手機鍵盤右下角「🎤」進行語音評測', true);
+    }
+  }
+
+  /* ---------- 渲染字幕與「自動記憶續關」單題闖關模式 ---------- */
+  function renderSubtitles() {
+    listEl.innerHTML = '';
+    cardMap.clear();
+    listEl.classList.toggle('test-mode', state.mode === 'cloze');
+    const data = getFilteredSubtitles();
+
+    if (!data.length) {
+      const emptyReason = state.searchQuery
+        ? `🔍 找不到包含「${esc(state.searchQuery)}」的句子`
+        : (state.filterStar ? '⭐ 恭喜！錯題本內所有句子皆已過關清空！' : (state.hideMastered ? '🎉 所有句子皆已標記熟練！點擊上方「✅ 隱藏已熟」可重新顯示' : '請導入 SRT 字幕或點擊上方🎬範例'));
+      listEl.innerHTML = `<div class="empty-state"><h3>${emptyReason}</h3></div>`;
+      return;
+    }
+
+    if (currentId === -1 || !data.some(s => s.id === currentId)) {
+      const savedLastId = isQuizMode() ? lastQuizIdMap[state.mode] : -1;
+      const savedSub = data.find(s => s.id === savedLastId && !isSubSolved(s.id));
+      const firstUnsolved = isQuizMode() ? (savedSub || data.find(s => !isSubSolved(s.id))) : data[0];
+      currentId = (firstUnsolved || data[0]).id;
+    }
+
+    const activeIdx = data.findIndex(s => s.id === currentId);
+
+    if (isQuizMode()) {
+      const activeSub = data[activeIdx] || data[0];
+      const solvedCount = data.filter(s => isSubSolved(s.id)).length;
+      const modeNames = {
+        cloze: '✏️ 聽力填空闖關',
+        scramble: '🧩 句子重組闖關',
+        oral: '🎙️ 口說 80 分闖關'
+      };
+
+      const firstUnsolvedIdx = data.findIndex(s => !isSubSolved(s.id));
+      const optionsHtml = data.map((s, idx) => {
+        const done = isSubSolved(s.id);
+        const isFirstTodo = (idx === firstUnsolvedIdx);
+        const isCur = (s.id === activeSub.id);
+        const canSelect = done || isFirstTodo || idx <= activeIdx;
+        const statusIcon = done ? '✅' : (isFirstTodo ? '🎯' : '🔒');
+        return `<option value="${s.id}" ${isCur ? 'selected' : ''} ${!canSelect ? 'disabled' : ''}>${statusIcon} 第 ${idx + 1} 題 (${s.rawTime})</option>`;
+      }).join('');
+
+      const banner = document.createElement('div');
+      banner.className = 'quiz-stage-banner';
+      banner.innerHTML = `
+        <div class="quiz-stage-top">
+          <div class="quiz-stage-title">${modeNames[state.mode]} · 第 ${activeIdx + 1} / ${data.length} 題</div>
+          <div class="quiz-stage-progress">💾 自動存檔 · 已過關 ${solvedCount} / ${data.length}</div>
+        </div>
+        <div class="quiz-stage-sub">
+          ✨ <b>進度已永久保留：</b>隨時關閉網頁或切換回一般模式，下次點開「${modeNames[state.mode]}」會<b>自動從第 ${activeIdx + 1} 題繼續</b>（包含打字與排方塊草稿）！
+        </div>
+        <div class="quiz-stage-actions">
+          <button class="quiz-action-btn" id="btnStageReplay">🔊 重聽本題 (${esc(activeSub.rawTime)})</button>
+          <button class="quiz-action-btn secondary" id="btnStageClearTTS">🗣️ 清晰朗讀</button>
+          ${activeIdx > 0 ? `<button class="quiz-action-btn secondary" id="btnStagePrev">⬅️ 上一題</button>` : ''}
+          <select class="quiz-jump-select" id="quizJumpSelect" title="跳轉至已過關或當前進度題目">${optionsHtml}</select>
+          ${solvedCount > 0 ? `<button class="quiz-action-btn danger-outline" id="btnResetQuizProgress" title="清空本模式過關紀錄，從第1題重新挑戰">🔄 重置進度</button>` : ''}
+        </div>
+      `;
+      listEl.appendChild(banner);
+
+      banner.querySelector('#btnStageReplay').addEventListener('click', () => {
+        playSentenceAudio(activeSub, true);
+      });
+      banner.querySelector('#btnStageClearTTS').addEventListener('click', () => {
+        if (media && !media.paused) media.pause();
+        speakText(activeSub.en, 0.88, 1.0);
+      });
+      const prevBtn = banner.querySelector('#btnStagePrev');
+      if (prevBtn) {
+        prevBtn.addEventListener('click', () => jumpSentence(-1));
+      }
+      const jumpSelect = banner.querySelector('#quizJumpSelect');
+      if (jumpSelect) {
+        jumpSelect.addEventListener('change', e => {
+          const targetId = Number(e.target.value);
+          const targetSub = data.find(s => s.id === targetId);
+          if (targetSub) {
+            currentId = targetSub.id;
+            lastQuizIdMap[state.mode] = currentId;
+            saveQuizProgress();
+            renderSubtitles();
+            playSentenceAudio(targetSub, true);
+          }
+        });
+      }
+      const resetBtn = banner.querySelector('#btnResetQuizProgress');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          solvedMap[state.mode].clear();
+          lastQuizIdMap[state.mode] = data[0].id;
+          if (state.mode === 'scramble') scrambleDrafts = {};
+          if (state.mode === 'cloze') clozeDrafts = {};
+          if (state.mode === 'oral') {
+            data.forEach(s => { delete oralScores['sub_' + s.id]; delete oralReports['sub_' + s.id]; });
+          }
+          currentId = data[0].id;
+          saveQuizProgress();
+          updateCounters();
+          renderSubtitles();
+          playSentenceAudio(data[0], true);
+          showToast('🔄 已重置本模式的闖關進度，從第 1 題重新開始！');
+        });
+      }
+    }
+
+    const itemsToRender = isQuizMode()
+      ? [{ sub: data[activeIdx] || data[0], idx: activeIdx >= 0 ? activeIdx : 0 }]
+      : data.map((sub, idx) => ({ sub, idx }));
+
+    itemsToRender.forEach(({ sub, idx }) => {
+      const solved = isSubSolved(sub.id);
+      const isCurrent = (sub.id === currentId);
+      const isMastered = masteredSet.has(sub.id);
+      const inABRange = abRepeat.active && sub.id >= abRepeat.startSubId && sub.id <= abRepeat.endSubId;
+
+      const card = document.createElement('div');
+      card.className = 'sub-card'
+        + (isCurrent ? ' active' : '')
+        + (inABRange ? ' ab-in-range' : '')
+        + (isMastered ? ' mastered-card' : '');
+      card.dataset.id = sub.id;
+
+      let enContent = '';
+      if (state.mode === 'cloze') {
+        enContent = solved
+          ? `<span style="color:var(--success);">✅ ${esc(sub.en)}</span> <button class="tts-clear-btn" data-redo-cloze="${sub.id}" style="margin-left:8px;">🔄 重練填空</button>`
+          : clozeHTML(sub);
+      } else if (state.mode === 'scramble') {
+        enContent = solved
+          ? `<span style="color:var(--success);">✅ ${esc(sub.en)}</span> <button class="tts-clear-btn" data-redo-scramble="${sub.id}" style="margin-left:8px;">🔄 重玩本題</button>`
+          : scrambleHTML(sub);
+      } else {
+        enContent = formatNormalHTML(sub);
+      }
+
+      const phoneticBarHTML = (state.showLinking && state.mode === 'normal') ? getPhoneticTipsForSentence(sub.en) : '';
+
+      let quizTagHTML = '';
+      if (isQuizMode()) {
+        quizTagHTML = solved
+          ? `<span class="quiz-state-tag done">✅ 本題已過關</span>`
+          : `<span class="quiz-state-tag current">🎯 破關自動存檔並往下一題</span>`;
+      }
+
+      const prevScore = oralScores['sub_' + sub.id];
+      const prevReport = oralReports['sub_' + sub.id];
+      const hasMyVoice = !!recordedAudioMap[sub.id];
+      const badgeClass = prevScore !== undefined ? (prevScore >= 80 ? 'pass' : 'fail') : '';
+      const badgeText = prevScore !== undefined
+        ? (prevScore >= 80 ? `✅ ${prevScore} 分 (通過！)` : `❌ ${prevScore} 分 (未滿80留級)`)
+        : '🎯 目標：80 分及格';
+
+      const defaultReportHTML = prevReport || `
+        <div class="oral-coach-tip" style="border-top:none; margin-top:0; padding-top:0; color:#9ca3af;">
+          💡 <b>跟讀秘訣：</b>按下粉紅錄音鍵看到「紅色波形」後再開口。唸完會呈現 <b><span style="color:#4ade80">綠色(標準)</span> / <span style="color:#facc15">黃色(偏音)</span> / <span style="color:#f87171">紅色(漏唸)</span></b> 逐字診斷，還可點<b>「🎧 聽我的錄音」</b>比對原音！
+        </div>`;
+
+      const oralHTML = (state.mode === 'oral') ? `
+        <div class="oral-box">
+          <div class="oral-top-row">
+            <div class="oral-btn-group">
+              <button class="oral-mic-btn" data-oral-sub="${sub.id}">🎙️ 點擊開口跟讀評測</button>
+              <button class="oral-myvoice-btn ${hasMyVoice ? 'ready' : ''}" id="oralMyVoice_${sub.id}" data-myvoice-sub="${sub.id}">🎧 聽我的錄音</button>
+              <button class="oral-replay-btn" data-replay-sub="${sub.id}">🔊 慢速大聲示範</button>
+            </div>
+            <span class="oral-score-badge ${badgeClass}" id="oralBadge_${sub.id}">${badgeText}</span>
+          </div>
+          <div class="oral-live-bar" id="oralLive_${sub.id}"></div>
+          <div class="oral-report" id="oralTrans_${sub.id}">${defaultReportHTML}</div>
+          <div class="oral-manual-row" id="oralFallback_${sub.id}">
+            <input class="oral-manual-inp" placeholder="🎤 若麥克風受阻，點此按手機鍵盤「語音麥克風」開口唸..." autocomplete="off">
+            <button class="oral-manual-btn">送出評分</button>
+          </div>
+        </div>
+      ` : '';
+
+      const pCount = practiceCounts[sub.id] || 0;
+
+      card.innerHTML = `
+        <div class="sub-header">
+          <div class="sub-header-left">
+            <span class="sub-time">#${sub.id} · ${esc(sub.rawTime)}</span>
+            <button class="replay-this-btn" data-play-sent="${sub.id}" title="使用音量放大器播放本句原聲">🔊 播放本句</button>
+            <button class="tts-clear-btn" data-tts-sent="${sub.id}" title="使用超大聲清晰AI人聲朗讀本句">🗣️ 清晰朗讀</button>
+            <span class="prac-count-badge" title="本句累積跟讀練習次數">🔥 ${pCount}</span>
+            ${quizTagHTML}
+          </div>
+          <div class="sub-header-right">
+            ${!isQuizMode() ? `<button class="mastered-btn ${isMastered ? 'is-mastered' : ''}" data-master-id="${sub.id}" title="標記此句為已熟練">${isMastered ? '✓ 已熟' : '✓ 熟練'}</button>` : ''}
+            <button class="star-btn ${bookmarks.has(sub.id) ? 'starred' : ''}" data-star="${sub.id}">★</button>
+          </div>
+        </div>
+        <div class="sub-text-en">${enContent}</div>
+        ${phoneticBarHTML}
+        ${sub.zh ? `<div class="sub-text-zh">${esc(sub.zh)}</div>` : ''}
+        <div class="shadow-wait-bar" id="waitBar_${sub.id}"></div>
+        ${oralHTML}`;
+
+      card.addEventListener('click', e => {
+        if (e.target.dataset.star || e.target.dataset.masterId || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.closest('.oral-box') || e.target.classList.contains('scramble-btn')) return;
+
+        if (e.target.classList.contains('clickable-word')) {
+          e.stopPropagation();
+          handleWordClick(sub, Number(e.target.dataset.wordIdx));
+          return;
+        }
+
+        currentId = sub.id;
+        setActive(sub.id, false);
+        playSentenceAudio(sub, !state.shadowWait);
+      });
+
+      listEl.appendChild(card);
+      cardMap.set(sub.id, card);
+    });
+
+    // 綁定「✓ 熟練」按鈕
+    listEl.querySelectorAll('[data-master-id]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const sid = Number(btn.dataset.masterId);
+        if (masteredSet.has(sid)) {
+          masteredSet.delete(sid);
+          showToast('已取消熟練標記');
+        } else {
+          masteredSet.add(sid);
+          showToast('✅ 已標記為熟練句！（可點上方「✅ 隱藏已熟」過濾簡單句）');
+        }
+        saveQuizProgress();
+        updateCounters();
+        renderSubtitles();
+      });
+    });
+
+    // 綁定「🔄 重玩本題」與「🔄 重練填空」按鈕
+    listEl.querySelectorAll('[data-redo-scramble]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const sid = Number(btn.dataset.redoScramble);
+        solvedMap.scramble.delete(sid);
+        delete scrambleDrafts[sid];
+        saveQuizProgress();
+        updateCounters();
+        renderSubtitles();
+      });
+    });
+    listEl.querySelectorAll('[data-redo-cloze]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const sid = Number(btn.dataset.redoCloze);
+        solvedMap.cloze.delete(sid);
+        delete clozeDrafts[sid];
+        saveQuizProgress();
+        updateCounters();
+        renderSubtitles();
+      });
+    });
+
+    // 綁定「🔊 播放本句」按鈕
+    listEl.querySelectorAll('.replay-this-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const sid = Number(btn.dataset.playSent);
+        const sub = subtitles.find(s => s.id === sid);
+        if (sub) {
+          currentId = sub.id;
+          setActive(sub.id, false);
+          playSentenceAudio(sub, true);
+        }
+      });
+    });
+
+    // 綁定「🗣️ 清晰朗讀」按鈕
+    listEl.querySelectorAll('.tts-clear-btn:not([data-redo-scramble]):not([data-redo-cloze])').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const sid = Number(btn.dataset.ttsSent);
+        const sub = subtitles.find(s => s.id === sid);
+        if (sub) {
+          if (media && !media.paused) media.pause();
+          currentId = sub.id;
+          setActive(sub.id, false);
+          incrementPracticeCount(sub.id);
+          speakText(sub.en, 0.9, 1.0);
+        }
+      });
+    });
+
+    listEl.querySelectorAll('.star-btn').forEach(b => {
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = Number(b.dataset.star);
+        if (bookmarks.has(id)) {
+          const sc = oralScores['sub_' + id] || 0;
+          if (state.mode === 'oral' && sc < 80) {
+            showToast(`⚠️ 口說測驗尚未衝過 80 分（目前 ${sc} 分），必須留在題庫本繼續挑戰！`, true);
+            return;
+          }
+          bookmarks.delete(id);
+          b.classList.remove('starred');
+        } else {
+          bookmarks.add(id);
+          b.classList.add('starred');
+        }
+        saveBookmarks();
+        if (state.filterStar) renderSubtitles();
+      });
+    });
+
+    if (state.mode === 'oral') {
+      listEl.querySelectorAll('.oral-replay-btn').forEach(rBtn => {
+        rBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const subId = Number(rBtn.dataset.replaySub);
+          const sub = subtitles.find(s => s.id === subId);
+          if (sub) speakText(sub.en, 0.78, 1.0);
+        });
+      });
+
+      listEl.querySelectorAll('.oral-myvoice-btn').forEach(vBtn => {
+        vBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          const subId = Number(vBtn.dataset.myvoiceSub);
+          const blobUrl = recordedAudioMap[subId];
+          if (blobUrl) {
+            if (media && !media.paused) media.pause();
+            window.speechSynthesis.cancel();
+            const myAudio = new Audio(blobUrl);
+            myAudio.volume = 1.0;
+            myAudio.play().catch(() => {});
+            showToast('🎧 正在播放你剛剛的開口錄音...');
+          }
+        });
+      });
+
+      listEl.querySelectorAll('.oral-mic-btn').forEach(btn => {
+        const subId = Number(btn.dataset.oralSub);
+        const sub = subtitles.find(s => s.id === subId);
+        const badgeEl = $('oralBadge_' + subId);
+        const transEl = $('oralTrans_' + subId);
+        const liveEl = $('oralLive_' + subId);
+        const fallbackRow = $('oralFallback_' + subId);
+        const card = cardMap.get(subId);
+
+        const handleEvaluation = (spokenText) => {
+          incrementPracticeCount(subId);
+          const res = evaluateOralSpeech(sub.en, spokenText);
+          oralScores['sub_' + subId] = res.score;
+          oralReports['sub_' + subId] = res.htmlDiff;
+          transEl.innerHTML = res.htmlDiff;
+
+          if (res.score >= 80) {
+            solvedMap.oral.add(subId);
+            saveQuizProgress();
+            updateCounters();
+            badgeEl.className = 'oral-score-badge pass';
+            badgeEl.textContent = `✅ ${res.score} 分 (過關！)`;
+            showToast(`🎉 太棒了！口說 ${res.score} 分過關（進度已自動存檔），前往下一題！`);
+
+            if (state.filterStar && bookmarks.has(subId)) {
+              bookmarks.delete(subId);
+              saveBookmarks();
+            }
+            advanceToNextQuestion(subId);
+          } else {
+            saveQuizProgress();
+            badgeEl.className = 'oral-score-badge fail';
+            badgeEl.textContent = `❌ ${res.score} 分 (未滿80留級)`;
+            bookmarks.add(subId);
+            saveBookmarks();
+            const starBtn = card.querySelector('.star-btn');
+            if (starBtn) starBtn.classList.add('starred');
+            showToast(`❌ 僅 ${res.score} 分（未達80分）！可點「🎧 聽我的錄音」或紅/黃色字聽標準發音重練！`, true);
+          }
+        };
+
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          if (media && !media.paused) media.pause();
+          setActive(subId, false);
+          toggleSpeechRecognition(handleEvaluation, btn, liveEl, fallbackRow, subId);
+        });
+
+        if (fallbackRow) {
+          const inp = fallbackRow.querySelector('.oral-manual-inp');
+          const subBtn = fallbackRow.querySelector('.oral-manual-btn');
+          const submitManual = () => {
+            if (inp.value.trim()) {
+              handleEvaluation(inp.value.trim());
+              inp.value = '';
+            }
+          };
+          subBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            submitManual();
+          });
+          inp.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submitManual();
+            }
+          });
+        }
+      });
+    }
+
+    if (state.mode === 'cloze') {
+      const allBlanks = Array.from(listEl.querySelectorAll('.blank-input'));
+      const firstUnsolvedBlank = allBlanks.find(i => !i.classList.contains('correct'));
+      if (firstUnsolvedBlank) setTimeout(() => firstUnsolvedBlank.focus(), 80);
+
+      allBlanks.forEach((inp, bIdx) => {
+        inp.addEventListener('input', () => {
+          const card = inp.closest('.sub-card');
+          const subId = Number(card.dataset.id);
+          const ans = inp.dataset.answer;
+          const val = inp.value.trim().toLowerCase();
+
+          const currentInputs = Array.from(card.querySelectorAll('.blank-input')).map(i => i.value);
+          clozeDrafts[subId] = currentInputs;
+          saveQuizProgress();
+
+          if (val === ans) {
+            inp.classList.add('correct');
+            inp.classList.remove('wrong');
+            const allInputs = Array.from(card.querySelectorAll('.blank-input'));
+            const nextInp = allInputs.find(i => !i.classList.contains('correct'));
+            if (nextInp) {
+              nextInp.focus();
+            } else {
+              solvedMap.cloze.add(subId);
+              delete clozeDrafts[subId];
+              incrementPracticeCount(subId);
+              saveQuizProgress();
+              updateCounters();
+              showToast('✅ 本題填空全對（進度已存檔）！自動進入下一題...');
+              advanceToNextQuestion(subId);
+            }
+          } else if (val.length >= ans.length) {
+            inp.classList.add('wrong');
+          } else {
+            inp.classList.remove('wrong');
+          }
+        });
+      });
+
+      listEl.querySelectorAll('[data-cloze-hint]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const card = btn.closest('.sub-card');
+          const allInputs = Array.from(card.querySelectorAll('.blank-input'));
+          const targetInp = allInputs.find(i => !i.classList.contains('correct'));
+          if (!targetInp) return;
+
+          const ans = targetInp.dataset.answer;
+          const curVal = targetInp.value.trim().toLowerCase();
+          let matchLen = 0;
+          while (matchLen < curVal.length && curVal[matchLen] === ans[matchLen]) {
+            matchLen++;
+          }
+          const nextRevealed = ans.slice(0, matchLen + 1);
+          targetInp.value = nextRevealed;
+          targetInp.focus();
+          targetInp.dispatchEvent(new Event('input'));
+          if (nextRevealed.length < ans.length) {
+            showToast(`💡 提示字母：${nextRevealed}... (完整單字共 ${ans.length} 個字母)`);
+          }
+        });
+      });
+
+      listEl.querySelectorAll('[data-cloze-reveal]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const card = btn.closest('.sub-card');
+          const allInputs = Array.from(card.querySelectorAll('.blank-input'));
+          const targetInp = allInputs.find(i => !i.classList.contains('correct'));
+          if (!targetInp) return;
+
+          const ans = targetInp.dataset.answer;
+          targetInp.value = ans;
+          speakText(ans, 0.9, 1.0);
+          targetInp.dispatchEvent(new Event('input'));
+        });
+      });
+    }
+  }
+
+  function clozeHTML(sub) {
+    const en = sub.en;
+    const savedDraft = clozeDrafts[sub.id] || [];
+    const tokens = en.split(/(\s+)/);
+
+    const candidateIndices = [];
+    tokens.forEach((tok, idx) => {
+      const clean = tok.replace(/[^a-zA-Z]/g, '');
+      if (clean.length >= 2) {
+        const lower = clean.toLowerCase();
+        const isPriority = !!savedWords[lower] || !!COMMON_WORD_DICT[lower] || IDIOM_DB.some(id => id.pattern.split(/\s+/).includes(lower));
+        candidateIndices.push({ idx, len: clean.length, isPriority });
+      }
+    });
+
+    let chosenSet = new Set();
+    candidateIndices.filter(c => c.isPriority).slice(0, 3).forEach(c => chosenSet.add(c.idx));
+    if (chosenSet.size < 3) {
+      candidateIndices.filter(c => !chosenSet.has(c.idx) && c.len >= 4).slice(0, 3 - chosenSet.size).forEach(c => chosenSet.add(c.idx));
+    }
+    if (chosenSet.size === 0 && candidateIndices.length > 0) {
+      const longest = [...candidateIndices].sort((a, b) => b.len - a.len)[0];
+      chosenSet.add(longest.idx);
+    }
+
+    let blankSeq = 0;
+    const bodyHtml = tokens.map((w, idx) => {
+      if (chosenSet.has(idx)) {
+        const cleanWord = w.replace(/[^a-zA-Z]/g, '');
+        const ans = cleanWord.toLowerCase();
+        const draftVal = savedDraft[blankSeq] || '';
+        const isAlreadyOk = draftVal.trim().toLowerCase() === ans;
+        blankSeq++;
+        const hint = cleanWord[0] + '_'.repeat(Math.max(1, cleanWord.length - 1));
+        return w.replace(cleanWord, `<input class="blank-input ${isAlreadyOk ? 'correct' : ''}" data-answer="${ans}" value="${esc(draftVal)}" placeholder="${hint}" autocomplete="off">`);
+      }
+      return esc(w);
+    }).join('');
+
+    return `
+      <div class="quiz-hint-toolbar">
+        <span class="quiz-hint-label">💡 聽不清楚空格嗎？</span>
+        <div class="quiz-hint-btns">
+          <button type="button" class="hint-pill-btn" data-cloze-hint="1">💡 提示1個字母</button>
+          <button type="button" class="hint-pill-btn reveal-all" data-cloze-reveal="1">👀 填入當前格答案</button>
+        </div>
+      </div>
+      <div>${bodyHtml}</div>
+    `;
+  }
+
+  function scrambleHTML(sub) {
+    const cleanStr = sub.en.replace(/[.,!?"']/g, '').trim();
+    const words = cleanStr.split(/\s+/).filter(Boolean);
+    const answer = words.join(' ');
+
+    let selectedWords = [];
+    let poolWords = [];
+    const draft = scrambleDrafts[sub.id];
+
+    if (draft && Array.isArray(draft.selected) && Array.isArray(draft.pool) && (draft.selected.length + draft.pool.length === words.length)) {
+      selectedWords = draft.selected;
+      poolWords = draft.pool;
+    } else {
+      poolWords = [...words].sort(() => Math.random() - 0.5);
+      scrambleDrafts[sub.id] = { selected: [], pool: poolWords };
+    }
+
+    let html = `
+      <div class="scramble-container" data-answer="${esc(answer)}" data-sub-id="${sub.id}">
+        <div class="quiz-hint-toolbar">
+          <span class="quiz-hint-label">👇 點擊方塊重組（卡關可按提示）：</span>
+          <div class="quiz-hint-btns">
+            <button type="button" class="hint-pill-btn" data-scramble-hint="${sub.id}">💡 幫我排下一個字</button>
+            <button type="button" class="hint-pill-btn reveal-all" data-scramble-peek="${sub.id}">👀 偷看正確答案</button>
+          </div>
+          <div class="answer-peek-box" id="peekBox_${sub.id}">📖 正確原句：${esc(sub.en)}</div>
+        </div>
+        <div class="scramble-selected">`;
+    selectedWords.forEach(w => { html += `<span class="scramble-btn">${esc(w)}</span>`; });
+    html += `</div><div class="scramble-pool">`;
+    poolWords.forEach(w => { html += `<span class="scramble-btn">${esc(w)}</span>`; });
+    html += `</div></div>`;
+    return html;
+  }
+
+  listEl.addEventListener('click', e => {
+    const pill = e.target.closest('.oral-pill');
+    if (pill && pill.dataset.speakWord) {
+      e.stopPropagation();
+      speakText(pill.dataset.speakWord, 0.8, 1.0);
+      showToast(`🔊 示範發音：${pill.dataset.speakWord}`);
+      return;
+    }
+
+    const peekBtn = e.target.closest('[data-scramble-peek]');
+    if (peekBtn) {
+      e.stopPropagation();
+      const subId = Number(peekBtn.dataset.scramblePeek);
+      const peekBox = $('peekBox_' + subId);
+      if (peekBox) {
+        const isShowing = peekBox.classList.toggle('show');
+        peekBtn.textContent = isShowing ? '🙈 隱藏答案' : '👀 偷看正確答案';
+      }
+      return;
+    }
+
+    const hintBtn = e.target.closest('[data-scramble-hint]');
+    if (hintBtn) {
+      e.stopPropagation();
+      const container = hintBtn.closest('.scramble-container');
+      const pool = container.querySelector('.scramble-pool');
+      const selected = container.querySelector('.scramble-selected');
+      const targetWords = container.dataset.answer.split(/\s+/);
+
+      const currentSelectedBtns = Array.from(selected.children);
+      for (let i = 0; i < currentSelectedBtns.length; i++) {
+        if (currentSelectedBtns[i].textContent.toLowerCase() !== targetWords[i].toLowerCase()) {
+          for (let j = i; j < currentSelectedBtns.length; j++) {
+            pool.appendChild(currentSelectedBtns[j]);
+          }
+          showToast('💡 發現前面有順序排錯的字，已先幫你退回並補上正確的下一個字！');
+          break;
+        }
+      }
+
+      const nextIdx = selected.children.length;
+      if (nextIdx < targetWords.length) {
+        const neededWord = targetWords[nextIdx];
+        const poolBtns = Array.from(pool.children);
+        const matchBtn = poolBtns.find(b => b.textContent.toLowerCase() === neededWord.toLowerCase());
+        if (matchBtn) {
+          matchBtn.click();
+          showToast(`💡 已幫你排入第 ${nextIdx + 1} 個字：「${matchBtn.textContent}」`);
+        }
+      }
+      return;
+    }
+
+    if (state.mode === 'scramble' && e.target.classList.contains('scramble-btn')) {
+      e.stopPropagation();
+      const btn = e.target;
+      const card = btn.closest('.sub-card');
+      const subId = Number(card.dataset.id);
+      const container = btn.closest('.scramble-container');
+      const pool = container.querySelector('.scramble-pool');
+      const selected = container.querySelector('.scramble-selected');
+
+      speakText(btn.textContent, 0.95, 1.0);
+
+      if (btn.parentElement === pool) selected.appendChild(btn);
+      else pool.appendChild(btn);
+
+      const curSelectedArr = Array.from(selected.children).map(b => b.textContent);
+      const curPoolArr = Array.from(pool.children).map(b => b.textContent);
+      scrambleDrafts[subId] = { selected: curSelectedArr, pool: curPoolArr };
+      saveQuizProgress();
+
+      if (pool.children.length === 0) {
+        const currentAnswer = curSelectedArr.join(' ');
+        if (currentAnswer.toLowerCase() === container.dataset.answer.toLowerCase()) {
+          selected.classList.add('correct');
+          selected.classList.remove('wrong');
+          solvedMap.scramble.add(subId);
+          incrementPracticeCount(subId);
+          delete scrambleDrafts[subId];
+          saveQuizProgress();
+          updateCounters();
+          showToast('🎉 句子重組正確（進度已自動存檔）！進入下一題...');
+          advanceToNextQuestion(subId);
+        } else {
+          selected.classList.add('wrong');
+          showToast('❌ 順序不對喔，已為你大聲重播本句音檔，再試一次！', true);
+          const curSub = subtitles.find(s => s.id === subId);
+          if (curSub) playSentenceAudio(curSub, true);
+          setTimeout(() => {
+            selected.classList.remove('wrong');
+            while (selected.firstChild) pool.appendChild(selected.firstChild);
+            scrambleDrafts[subId] = {
+              selected: [],
+              pool: Array.from(pool.children).map(b => b.textContent)
+            };
+            saveQuizProgress();
+          }, 550);
+        }
+      }
+    }
+  });
+
+  /* ---------- 點讀、前後字連點串連與雙引擎線上翻譯 ---------- */
+  const dictSheet = $('dictSheet'), dictBadge = $('dictBadge'), dictWord = $('dictWord');
+  const dictTrans = $('dictTrans'), dictNote = $('dictNote'), btnDictStar = $('btnDictStar');
+  const dictContextBox = $('dictContextBox'), dictContextEn = $('dictContextEn'), dictContextZh = $('dictContextZh');
+
+  function speakText(text, customRate = 0.92, customVolume = 1.0) {
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = customRate;
+      u.volume = customVolume;
+      u.pitch = 1.02;
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  dictWord.addEventListener('click', () => {
+    if (activeLookup.phrase) speakText(activeLookup.phrase, 0.92, 1.0);
+  });
+  $('btnDictAudio').addEventListener('click', () => {
+    if (activeLookup.phrase) speakText(activeLookup.phrase, 0.92, 1.0);
+  });
+
+  function clearSelectedWordHighlights() {
+    document.querySelectorAll('.clickable-word.selected-word').forEach(el => el.classList.remove('selected-word'));
+  }
+
+  function highlightActiveRange() {
+    clearSelectedWordHighlights();
+    if (activeLookup.subId === -1) return;
+    const card = cardMap.get(activeLookup.subId);
+    if (!card) return;
+    card.querySelectorAll('.clickable-word').forEach(el => {
+      const idx = Number(el.dataset.wordIdx);
+      if (idx >= activeLookup.startIdx && idx <= activeLookup.endIdx) {
+        el.classList.add('selected-word');
+      }
+    });
+  }
+
+  function handleWordClick(sub, clickedIdx) {
+    clearShadowWaitTimers();
+    if (media && !media.paused) media.pause();
+
+    const words = sub.en.split(/([a-zA-Z]+(?:['-][a-zA-Z]+)*)/).filter(t => /^[a-zA-Z]+(?:['-][a-zA-Z]+)*$/.test(t));
+    if (!words.length) return;
+
+    if (dictSheet.classList.contains('show') && activeLookup.subId === sub.id && (clickedIdx !== activeLookup.startIdx || clickedIdx !== activeLookup.endIdx)) {
+      const newStart = Math.min(activeLookup.startIdx, clickedIdx);
+      const newEnd = Math.max(activeLookup.endIdx, clickedIdx);
+      if (newEnd - newStart <= 5) {
+        updateLookupSelection(sub, words, newStart, newEnd, null);
+        return;
+      }
+    }
+
+    const idiomMatch = findIdiomMatchInSentence(words, clickedIdx);
+    if (idiomMatch) {
+      updateLookupSelection(sub, words, idiomMatch.startIdx, idiomMatch.endIdx, idiomMatch.info);
+    } else {
+      updateLookupSelection(sub, words, clickedIdx, clickedIdx, null);
+    }
+  }
+
+  $('btnExpandPrev').addEventListener('click', e => {
+    e.stopPropagation();
+    if (activeLookup.subId === -1 || activeLookup.startIdx <= 0) return;
+    const sub = subtitles.find(s => s.id === activeLookup.subId);
+    if (!sub) return;
+    updateLookupSelection(sub, activeLookup.words, activeLookup.startIdx - 1, activeLookup.endIdx, null);
+  });
+
+  $('btnExpandNext').addEventListener('click', e => {
+    e.stopPropagation();
+    if (activeLookup.subId === -1 || activeLookup.endIdx >= activeLookup.words.length - 1) return;
+    const sub = subtitles.find(s => s.id === activeLookup.subId);
+    if (!sub) return;
+    updateLookupSelection(sub, activeLookup.words, activeLookup.startIdx, activeLookup.endIdx + 1, null);
+  });
+
+  async function fetchTranslationWithFallback(queryText) {
+    const lowerQ = queryText.toLowerCase().trim();
+    if (COMMON_WORD_DICT[lowerQ]) return COMMON_WORD_DICT[lowerQ];
+
+    try {
+      const ctrl1 = new AbortController();
+      const t1 = setTimeout(() => ctrl1.abort(), 3200);
+      const res1 = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-TW&dt=t&q=${encodeURIComponent(queryText)}`, { signal: ctrl1.signal });
+      clearTimeout(t1);
+      if (res1.ok) {
+        const data1 = await res1.json();
+        const text1 = data1[0].map(item => item[0]).join('');
+        if (text1) return text1;
+      }
+    } catch (e) {}
+
+    try {
+      const ctrl2 = new AbortController();
+      const t2 = setTimeout(() => ctrl2.abort(), 3500);
+      const res2 = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(queryText)}&langpair=en|zh-TW`, { signal: ctrl2.signal });
+      clearTimeout(t2);
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2 && data2.responseData && data2.responseData.translatedText) {
+          return data2.responseData.translatedText;
+        }
+      }
+    } catch (e) {}
+
+    return null;
+  }
+
+  async function updateLookupSelection(sub, words, startIdx, endIdx, matchedIdiom) {
+    const phrase = words.slice(startIdx, endIdx + 1).join(' ');
+    const cleanKey = phrase.toLowerCase();
+
+    activeLookup = { subId: sub.id, words, startIdx, endIdx, phrase };
+    highlightActiveRange();
+    speakText(phrase, 0.92, 1.0);
+
+    $('btnExpandPrev').disabled = (startIdx <= 0);
+    $('btnExpandNext').disabled = (endIdx >= words.length - 1);
+    $('btnExpandPrev').style.opacity = startIdx <= 0 ? '0.35' : '1';
+    $('btnExpandNext').style.opacity = endIdx >= words.length - 1 ? '0.35' : '1';
+
+    if (!matchedIdiom && endIdx > startIdx) {
+      const exactIdiom = IDIOM_DB.find(item => item.pattern === cleanKey);
+      if (exactIdiom) matchedIdiom = exactIdiom;
+    }
+
+    dictWord.textContent = phrase;
+    btnDictStar.classList.toggle('starred', !!savedWords[cleanKey]);
+
+    dictContextBox.style.display = 'block';
+    const regex = new RegExp(`(${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i');
+    dictContextEn.innerHTML = `🗣️ 原句語境：${esc(sub.en).replace(regex, '<b>$1</b>')}`;
+    dictContextZh.textContent = sub.zh ? `💬 劇中翻譯：${sub.zh}` : '💬 正在分析整句語境翻譯...';
+
+    dictSheet.classList.add('show');
+
+    if (matchedIdiom) {
+      dictBadge.className = 'dict-badge slang';
+      dictBadge.textContent = '🔥 道地美式俚語 / 特殊文法';
+      dictTrans.textContent = matchedIdiom.zh;
+      dictNote.style.display = 'block';
+      dictNote.textContent = matchedIdiom.note;
+      if (savedWords[cleanKey]) {
+        savedWords[cleanKey] = matchedIdiom.zh;
+        saveWordsToStorage();
+      }
+    } else {
+      dictBadge.className = endIdx > startIdx ? 'dict-badge phrase' : 'dict-badge word';
+      dictBadge.textContent = endIdx > startIdx ? '🔗 前後字組合片語' : '📖 單字點讀 (可點前後字串連)';
+      dictNote.style.display = 'none';
+
+      if (COMMON_WORD_DICT[cleanKey]) {
+        dictTrans.textContent = COMMON_WORD_DICT[cleanKey];
+      } else if (savedWords[cleanKey] && !savedWords[cleanKey].includes('已收藏')) {
+        dictTrans.textContent = savedWords[cleanKey];
+      } else {
+        dictTrans.textContent = '查詢道地翻譯中...';
+      }
+
+      const translated = await fetchTranslationWithFallback(phrase);
+      if (activeLookup.phrase.toLowerCase() === cleanKey) {
+        if (translated) {
+          dictTrans.textContent = translated;
+          if (savedWords[cleanKey]) {
+            savedWords[cleanKey] = translated;
+            saveWordsToStorage();
+          }
+        } else if (!COMMON_WORD_DICT[cleanKey] && !savedWords[cleanKey]) {
+          dictTrans.textContent = sub.zh ? `請參考下方劇中語境：${sub.zh}` : '暫無網路連線 (仍可發音與按★收藏)';
+        }
+      }
+    }
+
+    if (!sub.zh) {
+      const fullSentTrans = await fetchTranslationWithFallback(sub.en);
+      if (fullSentTrans && activeLookup.subId === sub.id) {
+        dictContextZh.textContent = `💬 語境翻譯：${fullSentTrans}`;
+      }
+    }
+  }
+
+  $('btnDictClose').addEventListener('click', () => {
+    dictSheet.classList.remove('show');
+    clearSelectedWordHighlights();
+  });
+
+  document.addEventListener('click', e => {
+    if (dictSheet.classList.contains('show') && !dictSheet.contains(e.target) && !e.target.classList.contains('clickable-word')) {
+      dictSheet.classList.remove('show');
+      clearSelectedWordHighlights();
+    }
+  });
+
+  btnDictStar.addEventListener('click', () => {
+    if (!activeLookup.phrase) return;
+    const key = activeLookup.phrase.toLowerCase();
+    if (savedWords[key]) {
+      const sc = oralScores['word_' + key] || 0;
+      if (state.mode === 'oral' && sc < 80) {
+        showToast(`⚠️ 「${activeLookup.phrase}」口說尚未滿 80 分，禁止移除收藏！`, true);
+        return;
+      }
+      delete savedWords[key];
+      delete savedWordContexts[key];
+      btnDictStar.classList.remove('starred');
+      showToast(`已從單字本移除：${activeLookup.phrase}`, true);
+    } else {
+      const currentTrans = dictTrans.textContent;
+      savedWords[key] = (currentTrans && !currentTrans.includes('查詢') && !currentTrans.includes('載入中'))
+        ? currentTrans
+        : (COMMON_WORD_DICT[key] || '已收藏單字/片語');
+
+      const srcSub = subtitles.find(s => s.id === activeLookup.subId);
+      if (srcSub) {
+        savedWordContexts[key] = {
+          en: srcSub.en,
+          zh: srcSub.zh || '',
+          subId: srcSub.id,
+          rawTime: srcSub.rawTime
+        };
+      }
+      btnDictStar.classList.add('starred');
+      showToast(`★ 已收藏至單字本（含原劇例句）：${activeLookup.phrase}`);
+    }
+    saveWordsToStorage();
+    refreshSavedWordsHighlightInDOM();
+    if (state.view === 'wordbook') renderWordbook();
+  });
+
+  /* ---------- 單字本與拼寫/口說測驗（含原劇例句與一鍵跳回原音） ---------- */
+  function renderWordbook() {
+    wordbookEl.innerHTML = '';
+    const words = Object.keys(savedWords);
+
+    const topBar = document.createElement('div');
+    topBar.className = 'word-test-bar';
+    topBar.innerHTML = `
+      <span style="color:#9ca3af; font-size:14px; font-weight:bold;">已永久收藏 ${words.length} 個單字 / 片語</span>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        ${words.length > 0 ? `<button id="btnWordOralToggle" class="btn ${state.wordOralTest ? 'active-oral' : ''}">🎙️ ${state.wordOralTest ? '結束口說' : '口說80分闖關'}</button>` : ''}
+        ${words.length > 0 ? `<button id="btnWordTestToggle" class="btn ${state.wordTest ? 'active-test' : ''}">📝 ${state.wordTest ? '結束拼寫' : '拼寫測驗'}</button>` : ''}
+        <button id="btnExportData" class="btn" title="匯出單字本、錯題本與所有重組/測驗進度">📤 完整備份</button>
+        <label class="btn" style="cursor:pointer;" title="匯入備份檔案">📥 還原<input type="file" id="importDataInput" accept=".json" style="display:none;"></label>
+      </div>
+    `;
+    wordbookEl.appendChild(topBar);
+
+    const btnOralToggle = topBar.querySelector('#btnWordOralToggle');
+    if (btnOralToggle) {
+      btnOralToggle.addEventListener('click', () => {
+        state.wordOralTest = !state.wordOralTest;
+        if (state.wordOralTest) state.wordTest = false;
+        renderWordbook();
+      });
+    }
+
+    const btnToggle = topBar.querySelector('#btnWordTestToggle');
+    if (btnToggle) {
+      btnToggle.addEventListener('click', () => {
+        state.wordTest = !state.wordTest;
+        if (state.wordTest) state.wordOralTest = false;
+        renderWordbook();
+      });
+    }
+
+    topBar.querySelector('#btnExportData').addEventListener('click', () => {
+      saveQuizProgress();
+      const allQuizRecords = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('shadowing_quiz_')) {
+          try { allQuizRecords[k] = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+        }
+      }
+      const backup = {
+        bookmarks: [...bookmarks],
+        savedWords: savedWords,
+        savedWordContexts: savedWordContexts,
+        quizRecords: allQuizRecords,
+        exportDate: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `shadowing_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      showToast('已匯出單字本、原劇例句與所有闖關進度備份檔！');
+    });
+
+    topBar.querySelector('#importDataInput').addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (Array.isArray(data.bookmarks)) bookmarks = new Set(data.bookmarks);
+          if (data.savedWords && typeof data.savedWords === 'object') {
+            savedWords = { ...savedWords, ...data.savedWords };
+          }
+          if (data.savedWordContexts && typeof data.savedWordContexts === 'object') {
+            savedWordContexts = { ...savedWordContexts, ...data.savedWordContexts };
+          }
+          if (data.quizRecords && typeof data.quizRecords === 'object') {
+            Object.keys(data.quizRecords).forEach(k => {
+              localStorage.setItem(k, JSON.stringify(data.quizRecords[k]));
+            });
+            loadQuizProgressForCurrentSrt();
+          }
+          saveBookmarks();
+          saveWordsToStorage();
+          renderWordbook();
+          showToast('成功還原單字本、例句與所有測驗闖關進度！');
+        } catch (err) {
+          showToast('備份檔案格式不正確', true);
+        }
+      };
+      r.readAsText(f);
+      e.target.value = '';
+    });
+
+    if (words.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = `<h3>📚 單字本目前為空</h3><p>在字幕中點擊任何英文單字或俚語，按下「★」即可連同原劇例句一起收藏到此處複習與測驗！</p>`;
+      wordbookEl.appendChild(empty);
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'word-grid';
+
+    words.forEach(word => {
+      const card = document.createElement('div');
+      card.className = 'word-card';
+      const wScore = oralScores['word_' + word];
+
+      let ctx = savedWordContexts[word];
+      if (!ctx && subtitles.length) {
+        const foundSub = subtitles.find(s => s.en.toLowerCase().includes(word.toLowerCase()));
+        if (foundSub) {
+          ctx = { en: foundSub.en, zh: foundSub.zh, subId: foundSub.id, rawTime: foundSub.rawTime };
+        }
+      }
+
+      let enHtml = `<div class="word-card-en">${esc(word)}</div>`;
+      if (state.wordTest) {
+        const hint = word[0] + '_'.repeat(Math.max(1, word.length - 1));
+        enHtml = `
+          <input class="word-test-input" data-answer="${esc(word.toLowerCase())}" placeholder="${esc(hint)}" autocomplete="off">
+          <div style="display:flex; justify-content:center; gap:5px; margin-bottom:6px;">
+            <button type="button" class="hint-pill-btn" data-word-hint="1" style="padding:2px 7px; font-size:11px;">💡提示1字</button>
+            <button type="button" class="hint-pill-btn reveal-all" data-word-reveal="1" style="padding:2px 7px; font-size:11px;">👀看答案</button>
+          </div>
+        `;
+      }
+
+      let ctxHtml = '';
+      if (ctx && !state.wordTest) {
+        ctxHtml = `
+          <div class="word-card-ctx">
+            <div>🗣️ "${esc(ctx.en)}"</div>
+            ${ctx.zh ? `<div style="color:#86efac; margin-top:2px;">${esc(ctx.zh)}</div>` : ''}
+            <button type="button" class="word-ctx-jump-btn" data-jump-sub="${ctx.subId}">▶️ 跳回原句聽原音 (${esc(ctx.rawTime || '')})</button>
+          </div>
+        `;
+      }
+
+      let wordOralHtml = '';
+      if (state.wordOralTest) {
+        const bCls = wScore !== undefined ? (wScore >= 80 ? 'pass' : 'fail') : '';
+        const bTxt = wScore !== undefined ? `${wScore}分` : '目標:80分';
+        wordOralHtml = `
+          <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px; align-items:center;">
+            <span class="oral-score-badge ${bCls}" style="font-size:11px;">${bTxt}</span>
+            <button class="oral-mic-btn" style="padding:5px 10px; font-size:12px;">🎙️ 開口唸</button>
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div>
+          <button class="word-remove" title="移除">×</button>
+          ${enHtml}
+          <div class="word-card-zh">${esc(savedWords[word])}</div>
+        </div>
+        <div>
+          ${ctxHtml}
+          ${wordOralHtml}
+        </div>
+      `;
+
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('word-remove')) {
+          e.stopPropagation();
+          const sc = oralScores['word_' + word] || 0;
+          if (state.wordOralTest && sc < 80) {
+            showToast(`⚠️ 「${word}」口說僅 ${sc} 分（未滿80分），強制留在單字本不可移除！`, true);
+            speakText(word, 0.92, 1.0);
+            return;
+          }
+          delete savedWords[word];
+          delete savedWordContexts[word];
+          saveWordsToStorage();
+          refreshSavedWordsHighlightInDOM();
+          renderWordbook();
+        } else if (e.target.classList.contains('word-ctx-jump-btn')) {
+          e.stopPropagation();
+          const targetSubId = Number(e.target.dataset.jumpSub);
+          const targetSub = subtitles.find(s => s.id === targetSubId);
+          if (targetSub) {
+            state.view = 'subtitles';
+            state.filterStar = false;
+            listEl.style.display = 'block';
+            wordbookEl.style.display = 'none';
+            currentId = targetSub.id;
+            syncToolbarUI();
+            renderSubtitles();
+            setActive(targetSub.id, true);
+            playSentenceAudio(targetSub, true);
+          } else {
+            speakText(ctx ? ctx.en : word, 0.9, 1.0);
+          }
+        } else if (e.target.classList.contains('oral-mic-btn')) {
+          e.stopPropagation();
+          const micBtn = e.target;
+          toggleSpeechRecognition(spoken => {
+            const res = evaluateOralSpeech(word, spoken);
+            oralScores['word_' + word] = res.score;
+            saveQuizProgress();
+            if (res.score >= 80) {
+              showToast(`🎉 「${word}」口說 ${res.score} 分！成功突破 80 分門檻！`);
+            } else {
+              showToast(`❌ 系統聽到「${spoken}」(${res.score}分)，未滿 80 分強制留在題庫重練！`, true);
+              setTimeout(() => speakText(word, 0.8, 1.0), 500);
+            }
+            renderWordbook();
+          }, micBtn, null, null);
+        } else if (!e.target.classList.contains('word-test-input')) {
+          speakText(word, 0.92, 1.0);
+        }
+      });
+
+      if (state.wordTest) {
+        const inp = card.querySelector('.word-test-input');
+        inp.addEventListener('input', () => {
+          const ans = inp.dataset.answer;
+          const val = inp.value.trim().toLowerCase();
+          if (val === ans) {
+            inp.classList.add('correct');
+            inp.classList.remove('wrong');
+            speakText(word, 0.92, 1.0);
+          } else if (val.length >= ans.length) {
+            inp.classList.add('wrong');
+          } else {
+            inp.classList.remove('wrong');
+          }
+        });
+        inp.addEventListener('click', e => e.stopPropagation());
+
+        const wHintBtn = card.querySelector('[data-word-hint]');
+        if (wHintBtn) {
+          wHintBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            const ans = inp.dataset.answer;
+            const curVal = inp.value.trim().toLowerCase();
+            let matchLen = 0;
+            while (matchLen < curVal.length && curVal[matchLen] === ans[matchLen]) matchLen++;
+            inp.value = ans.slice(0, matchLen + 1);
+            inp.focus();
+            inp.dispatchEvent(new Event('input'));
+          });
+        }
+
+        const wRevealBtn = card.querySelector('[data-word-reveal]');
+        if (wRevealBtn) {
+          wRevealBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            inp.value = inp.dataset.answer;
+            inp.dispatchEvent(new Event('input'));
+          });
+        }
+      }
+      grid.appendChild(card);
+    });
+    wordbookEl.appendChild(grid);
+  }
+
+  media.addEventListener('timeupdate', () => {
+    const t = media.currentTime;
+    if (!isDraggingProgress) {
+      progressBar.value = t;
+      timeCurrent.textContent = formatSec(t);
+    }
+
+    if (!subtitles.length || state.view !== 'subtitles') return;
+
+    if (isQuizMode() || singleSentenceStopAt !== null || abRepeat.active || state.shadowWait) {
+      enforceQuizAudioBounds();
+      if (isQuizMode()) return;
+    }
+
+    let lo = 0, hi = subtitles.length - 1, ans = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (subtitles[mid].start <= t) { ans = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    const sub = ans >= 0 ? subtitles[ans] : null;
+
+    if (sub && sub.id !== currentId) {
+      currentId = sub.id;
+      lastWaitPausedSubId = -1;
+      setActive(sub.id, false);
+    }
+
+    if (sub && t >= sub.end - 0.06 && state.loop) {
+      media.currentTime = sub.start;
+    }
+  });
+
+  function setActive(id, forceScroll) {
+    currentId = id;
+    if (state.view !== 'subtitles') return;
+    cardMap.forEach((el, k) => el.classList.toggle('active', k === id));
+    const card = cardMap.get(id);
+    if (!card) return;
+
+    const userRecent = Date.now() - lastUserScroll < 3500;
+    if ((state.autoScroll || forceScroll) && !userRecent) {
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const isVisible = (cardRect.top >= wrapperRect.top + 30) && (cardRect.bottom <= wrapperRect.bottom - 30);
+      if (!isVisible || forceScroll) {
+        card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }
+  }
+
+  ['wheel', 'touchstart', 'mousedown'].forEach(ev =>
+    wrapper.addEventListener(ev, () => { lastUserScroll = Date.now(); }, { passive: true }));
+
+  function syncToolbarUI() {
+    $('btnAutoScroll').classList.toggle('active', state.autoScroll);
+    $('btnFilterStar').classList.toggle('active-star', state.filterStar);
+    $('btnWordbook').classList.toggle('active-wordbook', state.view === 'wordbook');
+    $('btnLoop').classList.toggle('active', state.loop);
+    $('btnTestMode').classList.toggle('active-test', state.mode === 'cloze');
+    $('btnSortMode').classList.toggle('active-sort', state.mode === 'scramble');
+    $('btnOralMode').classList.toggle('active-oral', state.mode === 'oral');
+    $('btnLinking').classList.toggle('active-link', state.showLinking);
+    $('btnHideMastered').classList.toggle('active', state.hideMastered);
+    btnShadowWait.classList.toggle('active-wait', state.shadowWait);
+
+    const maskLabels = ['👁️ 雙語', '🙈 遮中', '🙉 遮英', '🎧 盲聽'];
+    $('btnMaskMode').textContent = maskLabels[state.maskMode];
+    $('btnMaskMode').classList.toggle('active-mask', state.maskMode > 0);
+    listEl.classList.toggle('mask-zh', state.maskMode === 1);
+    listEl.classList.toggle('mask-en', state.maskMode === 2);
+    listEl.classList.toggle('mask-all', state.maskMode === 3);
+
+    updateCounters();
+  }
+
+  function activateQuizMode(targetMode, startMsg) {
+    clearShadowWaitTimers();
+    state.mode = state.mode === targetMode ? 'normal' : targetMode;
+    if (state.view === 'wordbook') {
+      state.view = 'subtitles';
+      listEl.style.display = 'block';
+      wordbookEl.style.display = 'none';
+    }
+    if (state.mode !== 'normal') {
+      const data = getFilteredSubtitles();
+      const savedId = lastQuizIdMap[state.mode];
+      const savedSub = data.find(s => s.id === savedId && !isSubSolved(s.id));
+      const firstUnsolved = savedSub || data.find(s => !isSubSolved(s.id)) || data[0];
+
+      if (firstUnsolved) {
+        currentId = firstUnsolved.id;
+        lastQuizIdMap[state.mode] = currentId;
+        saveQuizProgress();
+        playSentenceAudio(firstUnsolved, true);
+        const solvedCount = data.filter(s => isSubSolved(s.id)).length;
+        const resumeIdx = data.findIndex(s => s.id === firstUnsolved.id) + 1;
+        if (solvedCount > 0) {
+          showToast(`📂 已自動接續上次進度：從第 ${resumeIdx} 題繼續挑戰！（已完成 ${solvedCount}/${data.length} 題）`);
+        } else {
+          showToast(startMsg);
+        }
+      }
+    } else {
+      saveQuizProgress();
+    }
+    syncToolbarUI();
+    renderSubtitles();
+    setActive(currentId, true);
+  }
+
+  $('btnAutoScroll').addEventListener('click', () => { state.autoScroll = !state.autoScroll; syncToolbarUI(); });
+
+  $('btnLinking').addEventListener('click', () => {
+    state.showLinking = !state.showLinking;
+    syncToolbarUI();
+    renderSubtitles();
+    showToast(state.showLinking ? '🔗 已開啟「美式連音 ‿ 與弱讀」智慧標記！' : '已關閉連音標記');
+  });
+
+  $('btnHideMastered').addEventListener('click', () => {
+    state.hideMastered = !state.hideMastered;
+    syncToolbarUI();
+    renderSubtitles();
+    showToast(state.hideMastered ? `✅ 已隱藏 ${masteredSet.size} 句已熟練的簡單句` : '已顯示全部句子');
+  });
+
+  $('btnMaskMode').addEventListener('click', () => {
+    state.maskMode = (state.maskMode + 1) % 4;
+    syncToolbarUI();
+    const hints = ['顯示中英雙語字幕', '已遮蔽中文（按住卡片可偷看）', '已遮蔽英文（按住卡片可偷看）', '盲聽訓練模式（按住卡片可偷看）'];
+    showToast(hints[state.maskMode]);
+  });
+
+  $('btnFilterStar').addEventListener('click', () => {
+    state.filterStar = !state.filterStar;
+    if (state.view === 'wordbook') {
+      state.view = 'subtitles';
+      listEl.style.display = 'block';
+      wordbookEl.style.display = 'none';
+    }
+    currentId = -1;
+    syncToolbarUI();
+    renderSubtitles();
+    setActive(currentId, true);
+  });
+
+  $('btnTestMode').addEventListener('click', () => {
+    activateQuizMode('cloze', '✏️ 填空單題闖關：優先挖空收藏單字與重點詞，進度自動存檔！');
+  });
+
+  $('btnSortMode').addEventListener('click', () => {
+    activateQuizMode('scramble', '🧩 重組單題闖關：進度自動存檔，隨時可休息下次繼續！');
+  });
+
+  $('btnOralMode').addEventListener('click', () => {
+    activateQuizMode('oral', '🎙️ 口說單題闖關：支援錄音回放，滿 80 分自動推進下一題！');
+  });
+
+  $('btnLoop').addEventListener('click', () => { state.loop = !state.loop; syncToolbarUI(); });
+
+  $('btnWordbook').addEventListener('click', () => {
+    clearShadowWaitTimers();
+    state.view = state.view === 'wordbook' ? 'subtitles' : 'wordbook';
+    syncToolbarUI();
+    if (state.view === 'wordbook') {
+      listEl.style.display = 'none';
+      wordbookEl.style.display = 'block';
+      if (media && !media.paused) media.pause();
+      renderWordbook();
+    } else {
+      listEl.style.display = 'block';
+      wordbookEl.style.display = 'none';
+      renderSubtitles();
+      setActive(currentId, true);
+    }
+  });
+
+  // 支援電腦端快捷鍵（空白鍵播放/暫停、左右鍵切換上下句）
+  document.addEventListener('keydown', e => {
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      btnPlayPause.click();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      jumpSentence(-1);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      jumpSentence(1);
+    }
+  });
+
+  const cachedSrt = localStorage.getItem('shadowing_last_srt');
+  if (cachedSrt) {
+    subtitles = parseSubtitles(cachedSrt);
+  }
+  if (!subtitles.length) {
+    subtitles = parseSubtitles(DEMO_SRT);
+  }
+  if (subtitles.length) {
+    currentId = subtitles[0].id;
+    loadQuizProgressForCurrentSrt();
+  }
+  updateCounters();
+  renderSubtitles();
+})();
+</script>
+</body>
+</html>
